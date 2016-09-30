@@ -10,8 +10,41 @@
 #include <termios.h>
 #include <sys/ioctl.h>
 
+// Declarations.
+void enable_raw_mode();
+void disable_raw_mode();
+int read_key();
+
+// Terminal IO settings. Used to reset it when exiting to prevent terminal
+// data garbling.
+struct termios orig_termios;
+
+// Key enumerations
+enum KEY_CODES {
+	KEY_NULL     = 0,
+	KEY_CTRL_Q   = 0x11, // DC1, to exit the program.
+	KEY_ESC      = 0x1b, // ESC, for things like keys up, down, left, right, delete, ...
+
+	// 'Virtual keys', i.e. not corresponding to terminal escape sequences
+	// or any other ANSI stuff. Merely to identify keys returned by read_key().
+	VKEY_UP      = 1000, // [A
+	VKEY_DOWN,           // [B
+	VKEY_RIGHT,          // [C
+	VKEY_LEFT,           // [D
+	VKEY_HOME,           // [H
+	VKEY_END,            // [F
+};
+
 void enable_raw_mode() {
-	struct termios orig_termios;
+	// only enable raw mode when stdin is a tty.
+	if (!isatty(STDIN_FILENO)) {
+		perror("Input is not a TTY");
+		exit(1);
+	}
+
+	// Disable raw mode when we exit hx normally.
+	atexit(disable_raw_mode);
+
 	tcgetattr(STDIN_FILENO, &orig_termios);
 
 	struct termios raw = orig_termios;
@@ -39,8 +72,18 @@ void enable_raw_mode() {
 	}
 }
 
+void disable_raw_mode() {
+	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+
+	printf("\x1b[7mThank you for using hx!\x1b[0K");
+	fflush(stdout);
+}
+
+
 void clear_screen() {
-	printf("\x1b[2J");
+	if (write(STDOUT_FILENO, "\x1b[2J", 4) == -1) {
+		perror("Unable to clear screen");
+	}
 }
 
 void set_cursor_pos(uint8_t x, uint8_t y) {
@@ -48,24 +91,20 @@ void set_cursor_pos(uint8_t x, uint8_t y) {
 }
 
 void move_cursor(int dir) {
-#if 0
+	static const int LEN = 4;
+	char cruft[LEN];
+
 	switch (dir) {
-	case 0:
-		write(STDOUT_FILENO, "\x1b[1A", 4);
-		break;
-	case 1:
-		write(STDOUT_FILENO, "\x1b[1C", 4);
-		break;
-	case 2:
-		write(STDOUT_FILENO, "\x1b[1B", 4);
-		break;
-	case 3:
-		write(STDOUT_FILENO, "c\x1b[1D", 4);
-		break;
-	default:
-		break;
+	case VKEY_UP:    strncpy(cruft, "\x1b[1A", LEN); break;
+	case VKEY_RIGHT: strncpy(cruft, "\x1b[1C", LEN); break;
+	case VKEY_DOWN:  strncpy(cruft, "\x1b[1B", LEN); break;
+	case VKEY_LEFT:  strncpy(cruft, "\x1b[1D", LEN); break;
+	default: return;
 	}
-#endif
+
+	if (write(STDOUT_FILENO, cruft, 4) == -1) {
+		perror("Cant write to stdout??");
+	}
 }
 
 bool get_window_size(int* rows, int* cols) {
@@ -85,6 +124,9 @@ struct buffer {
 	int len;
 };
 
+/**
+ * Create a buffer on the heap and return it.
+ */
 struct buffer* buffer_create() {
 	struct buffer* b = malloc(sizeof(struct buffer));
 	if (b) {
@@ -97,11 +139,19 @@ struct buffer* buffer_create() {
 	}
 }
 
+/**
+ * Deletes the buffer's contents, and the buffer itself.
+ */
 void buffer_delete(struct buffer* buf) {
 	free(buf->contents);
 	free(buf);
 }
 
+/**
+ * Appends `what' to the buffer, writing at most `len' bytes. Note that
+ * if we use snprintf() to format a particular string, we have to subtract
+ * 1 from the `len', to discard the null terminator character.
+ */
 void buffer_append(struct buffer* buf, const char* what, size_t len) {
 	// reallocate the contents with more memory, to hold 'what'.
 	char* new = realloc(buf->contents, buf->len + len);
@@ -134,6 +184,7 @@ void openfile(const char* filename) {
 	fseek(fp, 0, SEEK_SET);
 
 	printf("File size in bytes is %ld\n", size);
+	fflush(stdout);
 
 	// allocate memory for the buffer. No need for extra
 	// room for a null string terminator, since we're possibly
@@ -149,22 +200,21 @@ void openfile(const char* filename) {
 	// write formatted data to a string
 	struct buffer* buf = buffer_create();
 
-	for(int i = 0; i < size; i++) {
-		char str[10];
-		// XXX:  snprintf adds a null byte.. we don't want that!
-		snprintf(str, 10, "%09x", i);
-		buffer_append(buf, str, 10);
-		buffer_append(buf, ": ", 2);
-		char hex[7];
-		if (contents[i] < '!' || contents[i] > '~') {
-			snprintf(hex, 7, ". = %02x\n", contents[i]);
-		} else {
-			snprintf(hex, 7, "%c = %02x\n", contents[i], contents[i]);
-		}
-		buffer_append(buf, hex, 7);
-		buffer_append(buf, "\n", 1);
-	}
+	// Variable used to check how many bytes were written using sprintf,
+	// excluding the terminating null byte.
+	int bytes_written = 0;
 
+	for(int i = 0; i < size; i++) {
+		char str[1000] = {0};
+
+		if (isprint(contents[i])) {
+			bytes_written = sprintf(str, "%09x: %c = %02x\n", i, contents[i], contents[i]);
+		} else {
+			bytes_written = sprintf(str, "%09x: \x1b[31;47m.\x1b[0m = %02x\n", i, contents[i]);
+		}
+
+		buffer_append(buf, str, bytes_written);
+	}
 	if (write(STDOUT_FILENO, buf->contents, buf->len) == -1) {
 		perror("Unable to write to stdout");
 		exit(1);
@@ -175,7 +225,12 @@ void openfile(const char* filename) {
 	fclose(fp);
 }
 
-int process_keypress() {
+/**
+ * Reads keypresses from stdin, and processes them accordingly. Escape sequences
+ * will be read properly as well (e.g. DEL will be the bytes 0x1b, 0x5b, 0x33, 0x7e).
+ * The returned integer will contain either one of the enum values, or the key pressed.
+ */
+int read_key() {
 	char c;
 	ssize_t nread;
 	// check == 0 to see if EOF.
@@ -185,12 +240,47 @@ int process_keypress() {
 		exit(2);
 	}
 
+	char seq[4]; // escape sequence buffer.
+
 	switch (c) {
-	case 'j':
-		move_cursor(2);
+	case KEY_ESC:
+		// Escape key was pressed, OR things like delete, arrow keys, ...
+		// So we will try to read ahead a few bytes, and see if there's more.
+		// For instance, a single Escape key only produces a single 0x1b char.
+		// A delete key produces 0x1b 0x5b 0x33 0x7e.
+		if (read(STDIN_FILENO, seq, 1) == 0) {
+			printf("Just an escape!\n");
+			return KEY_ESC;
+		}
+		if (read(STDIN_FILENO, seq + 1, 1) == 0) {
+			printf("Just an escape, 2!\n");
+			return KEY_ESC;
+		}
+
+		if (seq[0] == '[') {
+			switch (seq[1]) {
+			case 'A':
+				move_cursor(VKEY_UP);
+				return VKEY_UP;
+			case 'B':
+				move_cursor(VKEY_DOWN);
+				return VKEY_DOWN;
+			case 'C':
+				move_cursor(VKEY_RIGHT);
+				return VKEY_RIGHT;
+			case 'D':
+				move_cursor(VKEY_LEFT);
+				return VKEY_LEFT;
+			}
+		}
+
 		break;
-	case 'k':
-		move_cursor(0);
+	case KEY_CTRL_Q:
+		exit(0);
+		break;
+	default:
+		//write(STDOUT_FILENO, &c, 1);
+		//printf("%x\n", (unsigned char)c);
 		break;
 	}
 
@@ -253,29 +343,21 @@ void print_hex(const char* filename) {
 
 
 int main(int argc, char* argv[]) {
+#if 0
 	if (argc != 2) {
 		fprintf(stderr, "expected arg\n");
 		exit(2);
 	}
 
-	//openfile(argv[1]);
-	print_hex(argv[1]);
-#if 0
+	openfile(argv[1]);
+	//print_hex(argv[1]);
+#endif
 
 	enable_raw_mode();
 
-	int rows, cols;
-
-	get_window_size(&rows, &cols);
 	clear_screen();
-	set_cursor_pos(rows - 1, 0);
-	printf("\x1b[7mHi thar!\x1b[0K");
-
 	while (true) {
-		int ch = process_keypress();
-		process_keypress();
-		fflush(stdout);
+		read_key();
 	}
-#endif
 	return EXIT_SUCCESS;
 }
