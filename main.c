@@ -330,7 +330,17 @@ void render_contents(struct editor* e, struct buffer* b) {
 	int row_char_count = 0;
 
 	int offset;
-	for (offset = 0; offset < e->content_length; offset++) {
+	int start_offset = e->cursor_y * WIDTH;
+	if (start_offset > ec->content_length) {
+		start_offset = ec->content_length - WIDTH;
+	}
+	int bytes_per_screen = e->screen_rows * WIDTH - WIDTH;
+	int end_offset = bytes_per_screen + start_offset;
+	if (end_offset > ec->content_length) {
+		end_offset = ec->content_length;
+	}
+
+	for (offset = start_offset; offset < end_offset; offset++) {
 		if (offset % WIDTH == 0) {
 			int bwritten = snprintf(address, sizeof(address), "\e[0;33m%09x\e[0m:", offset);
 			buffer_append(b, address, bwritten);
@@ -377,6 +387,13 @@ void render_contents(struct editor* e, struct buffer* b) {
 		buffer_append(b, "\e[1;32m  ", 10);
 		buffer_append(b, asc, strlen(asc));
 	}
+
+	// clear everything up until the end
+	buffer_append(b, "\x1b[0J", 4);
+
+	char debug[80] = {0};
+	snprintf(debug, sizeof(debug), "\x1b[37m\x1b[0;80HRows: %d, start offset: %09x, end offset: %09x", ec->screen_rows, start_offset, end_offset);
+	buffer_append(b, debug, sizeof(debug));
 }
 
 /**
@@ -428,7 +445,11 @@ void process_keypress(struct editor* ec) {
 	if (c == KEY_CTRL_Q) {
 		exit(0);
 	} else if (c == KEY_UP) {
+		if (ec->cursor_y > 0) {
+			ec->cursor_y--;
+		}
 	} else if (c == KEY_DOWN) {
+		ec->cursor_y++;
 	} else if (c == KEY_RIGHT) {
 	} else if (c == KEY_LEFT) {
 	} else if (c == KEY_HOME) {
@@ -436,6 +457,8 @@ void process_keypress(struct editor* ec) {
 	} else {
 		editor_insert(ec, (char) c);
 	}
+
+	editor_statusmessage(ec, "Row: %d", ec->cursor_y);
 }
 
 /**
