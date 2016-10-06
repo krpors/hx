@@ -18,6 +18,9 @@
  * This struct contains internal information of the state of the editor.
  */
 struct editor {
+	int octets_per_line;
+	int grouping;
+
 	int cursor_x;    // Cursor x pos
 	int cursor_y;    // Cursor y pos
 	int screen_rows; // amount of screen rows after init
@@ -62,6 +65,7 @@ enum KEY_CODES {
 	KEY_LEFT,           // [D
 	KEY_HOME,           // [H
 	KEY_END,            // [F
+	KEY_PAGEUP,         // ??
 };
 
 void enable_raw_mode() {
@@ -317,9 +321,6 @@ int read_key() {
  * the width.
  */
 void render_contents(struct editor* e, struct buffer* b) {
-	static const int WIDTH    = 16;            // 16 bytes per row.
-	static const int GROUPING = 2;             // byte grouping.
-
 	char address[80];  // example: 000000040
 	char hex[ 2 + 1];  // example: 65
 	char asc[256 + 1]; // example: Hello.World!
@@ -330,18 +331,18 @@ void render_contents(struct editor* e, struct buffer* b) {
 	int row_char_count = 0;
 
 	int offset;
-	int start_offset = e->cursor_y * WIDTH;
+	int start_offset = e->cursor_y * ec->octets_per_line;
 	if (start_offset > ec->content_length) {
-		start_offset = ec->content_length - WIDTH;
+		start_offset = ec->content_length - ec->octets_per_line;
 	}
-	int bytes_per_screen = e->screen_rows * WIDTH - WIDTH;
+	int bytes_per_screen = e->screen_rows * ec->octets_per_line - ec->octets_per_line;
 	int end_offset = bytes_per_screen + start_offset;
 	if (end_offset > ec->content_length) {
 		end_offset = ec->content_length;
 	}
 
 	for (offset = start_offset; offset < end_offset; offset++) {
-		if (offset % WIDTH == 0) {
+		if (offset % ec->octets_per_line == 0) {
 			int bwritten = snprintf(address, sizeof(address), "\e[0;33m%09x\e[0m:", offset);
 			buffer_append(b, address, bwritten);
 			memset(asc, 0, sizeof(asc));
@@ -354,12 +355,12 @@ void render_contents(struct editor* e, struct buffer* b) {
 		// 16 bytes are set. This will be written later when the hex
 		// values are drawn to screen.
 		if (isprint(e->contents[offset])) {
-			asc[offset % WIDTH] = e->contents[offset];
+			asc[offset % ec->octets_per_line] = e->contents[offset];
 		} else {
-			asc[offset % WIDTH] = '.';
+			asc[offset % ec->octets_per_line] = '.';
 		}
 
-		if (offset % GROUPING == 0) {
+		if (offset % ec->grouping == 0) {
 			buffer_append(b, " ", 1);
 			row_char_count++;
 		}
@@ -370,7 +371,7 @@ void render_contents(struct editor* e, struct buffer* b) {
 
 		// If we reached the end of a 'row', start writing the ASCII equivalents
 		// of the 'row', in a different color. Then hit CRLF to go to the next line.
-		if ((offset+1) % WIDTH == 0) {
+		if ((offset+1) % ec->octets_per_line == 0) {
 			buffer_append(b, "\e[1;32m", 8);
 			buffer_append(b, "  ", 2);
 			buffer_append(b, asc, strlen(asc));
@@ -380,10 +381,10 @@ void render_contents(struct editor* e, struct buffer* b) {
 
 	// Check remainder of the last offset. If its bigger than zero,
 	// we got a last line to write (ASCII only).
-	if (offset % WIDTH > 0) {
+	if (offset % ec->octets_per_line > 0) {
 		char padding[980]; // padding characters, to align the ASCII.
-		memset(padding, ' ', (WIDTH * 2) + (WIDTH / GROUPING) - row_char_count);
-		buffer_append(b, padding, (WIDTH * 2) + (WIDTH / GROUPING) - row_char_count);
+		memset(padding, ' ', sizeof(padding));
+		buffer_append(b, padding, (ec->octets_per_line* 2) + (ec->octets_per_line / ec->grouping) - row_char_count);
 		buffer_append(b, "\e[1;32m  ", 10);
 		buffer_append(b, asc, strlen(asc));
 	}
@@ -411,13 +412,13 @@ void refresh_screen(struct editor* ec) {
 	render_contents(ec, b);
 
 	// Move down to write the status message.
-	bw = snprintf(buf, 20, "\x1b[%d;0H", ec->screen_rows);
+	bw = snprintf(buf, sizeof(buf), "\x1b[%d;0H", ec->screen_rows);
 	buffer_append(b, buf, bw);
 	// Change the color
 	buffer_append(b, "\x1b[0;30;47m", 10);
 	buffer_append(b, ec->statusmessage, strlen(ec->statusmessage));
 	// Clear until the end of the line to the right
-	buffer_append(b, "\x1b[0K", 4);
+	//buffer_append(b, "\x1b[0K", 4);
 
 	// Position cursor.
 	bw = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", 0, 0);
@@ -453,7 +454,9 @@ void process_keypress(struct editor* ec) {
 	} else if (c == KEY_RIGHT) {
 	} else if (c == KEY_LEFT) {
 	} else if (c == KEY_HOME) {
+		ec->cursor_y -= 10;
 	} else if (c == KEY_END) {
+		ec->cursor_y += 10;
 	} else {
 		editor_insert(ec, (char) c);
 	}
@@ -466,6 +469,9 @@ void process_keypress(struct editor* ec) {
  */
 struct editor* editor_init() {
 	struct editor* ec = malloc(sizeof(struct editor));
+
+	ec->octets_per_line = 16;
+	ec->grouping = 2;
 
 	ec->cursor_x = 0;
 	ec->cursor_y = 0;
