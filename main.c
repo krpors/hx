@@ -330,25 +330,35 @@ void render_contents(struct editor* e, struct buffer* b) {
 	// is over, but there's still some ASCII to write.
 	int row_char_count = 0;
 
-	int offset;
+	// start_offset is to determine where we should start reading from
+	// the buffer. This is dependent on where the cursor is, and on the
+	// octets which are visible per line.
 	int start_offset = e->cursor_y * ec->octets_per_line;
-	if (start_offset > ec->content_length) {
+	if (start_offset >= ec->content_length) {
 		start_offset = ec->content_length - ec->octets_per_line;
 	}
-	int bytes_per_screen = e->screen_rows * ec->octets_per_line - ec->octets_per_line;
+
+	// Determine the end offset for displaying. There is only so much
+	// to be displayed 'per screen'. I.e. if you can only display 1024
+	// bytes, you only have to read a maximum of 1024 bytes.
+	int bytes_per_screen = e->screen_rows * ec->octets_per_line;
 	int end_offset = bytes_per_screen + start_offset;
 	if (end_offset > ec->content_length) {
 		end_offset = ec->content_length;
 	}
 
+	int offset;
 	for (offset = start_offset; offset < end_offset; offset++) {
 		if (offset % ec->octets_per_line == 0) {
+			// start of a new row, beginning with an offset address in hex.
 			int bwritten = snprintf(address, sizeof(address), "\e[0;33m%09x\e[0m:", offset);
 			buffer_append(b, address, bwritten);
+			// Initialize the ascii buffer to all zeroes, and reset the row char count.
 			memset(asc, 0, sizeof(asc));
 			row_char_count = 0;
 		}
 
+		// Format a hex string of the current character in the offset.
 		snprintf(hex, sizeof(hex), "%02x", (unsigned char) e->contents[offset]);
 
 		// Every iteration, set the ascii value in the buffer, until
@@ -357,9 +367,11 @@ void render_contents(struct editor* e, struct buffer* b) {
 		if (isprint(e->contents[offset])) {
 			asc[offset % ec->octets_per_line] = e->contents[offset];
 		} else {
+			// non-printable characters are represented by a dot.
 			asc[offset % ec->octets_per_line] = '.';
 		}
 
+		// Every 'group' count, write a separator space.
 		if (offset % ec->grouping == 0) {
 			buffer_append(b, " ", 1);
 			row_char_count++;
@@ -450,7 +462,10 @@ void process_keypress(struct editor* ec) {
 			ec->cursor_y--;
 		}
 	} else if (c == KEY_DOWN) {
-		ec->cursor_y++;
+		int max_rows = ec->content_length / ec->octets_per_line;
+		if (ec->cursor_y < max_rows - ec->screen_rows + 2) {
+			ec->cursor_y++;
+		}
 	} else if (c == KEY_RIGHT) {
 	} else if (c == KEY_LEFT) {
 	} else if (c == KEY_HOME) {
