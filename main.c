@@ -41,6 +41,8 @@ int read_key();
 void process_keypress(struct editor* ec);
 
 struct editor* editor_init();
+void           editor_openfile(struct editor* e, const char* filename);
+void           editor_writefile(struct editor* e);
 void           editor_free(struct editor* ec);
 int            editor_statusmessage(struct editor* ec, const char* fmt, ...);
 void           editor_scroll(struct editor* e, int units);
@@ -56,6 +58,7 @@ struct termios orig_termios;
 enum KEY_CODES {
 	KEY_NULL     = 0,
 	KEY_CTRL_Q   = 0x11, // DC1, to exit the program.
+	KEY_CTRL_S   = 0x13, // DC2, to save the current buffer.
 	KEY_ESC      = 0x1b, // ESC, for things like keys up, down, left, right, delete, ...
 
 	// 'Virtual keys', i.e. not corresponding to terminal escape sequences
@@ -233,8 +236,12 @@ void editor_openfile(struct editor* ec, const char* filename) {
 	// set the indicator to the start of the file
 	fseek(fp, 0, SEEK_SET);
 
-	printf("File size in bytes is %ld\n", size);
-	fflush(stdout);
+	if (size <= 0) {
+		// TODO: file size is empty, then what?
+		printf("File is empty.\n");
+		fflush(stdout);
+		exit(0);
+	}
 
 	// allocate memory for the buffer. No need for extra
 	// room for a null string terminator, since we're possibly
@@ -252,6 +259,28 @@ void editor_openfile(struct editor* ec, const char* filename) {
 	ec->contents = contents;
 	ec->content_length = size;
 	editor_statusmessage(ec, "File opened: %s (%d bytes)", ec->filename, ec->content_length);
+
+	fclose(fp);
+}
+
+/**
+ * Writes the contents of the editor's buffer the to the same filename.
+ */
+void editor_writefile(struct editor* e) {
+	assert(e->filename != NULL);
+
+	FILE* fp = fopen(e->filename, "w");
+	if (fp == NULL) {
+		editor_statusmessage(ec, "Unable to open '%s' for writing", e->filename);
+		return;
+	}
+
+	size_t bw = fwrite(e->contents, sizeof(char), e->content_length, fp);
+	if (bw <= 0) {
+		editor_statusmessage(ec, "Couldn't write to file!!");
+	}
+
+	editor_statusmessage(ec, "\"%s\", %d bytes written", ec->filename, ec->content_length);
 
 	fclose(fp);
 }
@@ -502,27 +531,20 @@ void editor_insert(struct editor* ec, char x) {
  */
 void process_keypress(struct editor* ec) {
 	int c = read_key();
-	if (c == KEY_CTRL_Q) {
-		exit(0);
-	} else if (c == KEY_UP) {
-		editor_scroll(ec, -1);
-	} else if (c == KEY_DOWN) {
-		editor_scroll(ec, 1);
-	} else if (c == KEY_RIGHT) {
-	} else if (c == KEY_LEFT) {
-	} else if (c == KEY_HOME) {
-		ec->cursor_y = 0;
-	} else if (c == KEY_END) {
-		editor_scroll(ec, ec->content_length); // some arbitrary high number
-	} else if (c == KEY_PAGEDOWN) {
-		editor_scroll(ec, ec->screen_rows - 2);
-	} else if (c == KEY_PAGEUP) {
-		editor_scroll(ec, -ec->screen_rows + 2);
-	} else {
+	switch (c) {
+	case KEY_CTRL_Q:   exit(0); break;
+	case KEY_CTRL_S:   editor_writefile(ec); break;
+	case KEY_UP:       editor_scroll(ec, -1); break;
+	case KEY_DOWN:     editor_scroll(ec, 1); break;
+	case KEY_RIGHT:    break;
+	case KEY_LEFT:     break;
+	case KEY_HOME:     ec->cursor_y = 0; break;
+	case KEY_END:      editor_scroll(ec, ec->content_length); break;
+	case KEY_PAGEUP:   editor_scroll(ec, -(ec->screen_rows) + 2); break;
+	case KEY_PAGEDOWN: editor_scroll(ec, ec->screen_rows - 2); break;
+	default:
 		editor_insert(ec, (char) c);
 	}
-
-	editor_statusmessage(ec, "Cursor y at: %d", ec->cursor_y);
 }
 
 /**
