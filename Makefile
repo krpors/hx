@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-std=gnu99 -Wall -O3
+CFLAGS=-std=c99 -Wall -O3
 
 DEPS=
 OBJECTS=main.o

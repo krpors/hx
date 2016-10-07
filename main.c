@@ -43,6 +43,7 @@ void process_keypress(struct editor* ec);
 struct editor* editor_init();
 void           editor_free(struct editor* ec);
 int            editor_statusmessage(struct editor* ec, const char* fmt, ...);
+void           editor_scroll(struct editor* e, int units);
 
 // Global editor config.
 struct editor* ec;
@@ -66,6 +67,7 @@ enum KEY_CODES {
 	KEY_HOME,           // [H
 	KEY_END,            // [F
 	KEY_PAGEUP,         // ??
+	KEY_PAGEDOWN,       // ??
 };
 
 void enable_raw_mode() {
@@ -98,7 +100,7 @@ void enable_raw_mode() {
 	raw.c_cc[VTIME] = 1;
 
     // put terminal in raw mode after flushing
-	int x = tcsetattr(STDIN_FILENO, TCSANOW, &raw);
+	int x = tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
 	if (x != 0) {
 		perror("Unable to set terminal attributes");
 		exit(1);
@@ -108,7 +110,7 @@ void enable_raw_mode() {
 void disable_raw_mode() {
 	editor_free(ec);
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-	printf("\x1b[2J\x1b[7mThank you for using hx!\x1b[0K\r\n");
+	printf("\x1b[2J\x1b[7mThank you for using hx!\x1b[0m\x1b[0K\r\n");
 	fflush(stdout);
 }
 
@@ -254,6 +256,29 @@ void editor_openfile(struct editor* ec, const char* filename) {
 	fclose(fp);
 }
 
+/**
+ * Scrolls the editor by updating the cursor_y accordingly, within
+ * the bounds of the readable parts of the buffer.
+ */
+void editor_scroll(struct editor* e, int units) {
+	e->cursor_y += units;
+
+	// if our cursor goes beyond the lower limit (which is 0, duh)
+	// then set our cursor position to just that.
+	if (e->cursor_y <= 0) {
+		e->cursor_y = 0;
+	}
+
+	// if our cursor goes beyond the upper limit, then set our cursor
+	// to the max. Since we are displaying data in a sort of matrix form,
+	// meaning (rows × columns), we have to calculate the upper limit of
+	// the cursor.
+	int upper_limit = e->content_length / e->octets_per_line;
+	if (e->cursor_y >= upper_limit) {
+		e->cursor_y = upper_limit;
+	}
+}
+
 int editor_statusmessage(struct editor* e, const char* fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
@@ -294,21 +319,37 @@ int read_key() {
 			return KEY_ESC;
 		}
 
+		// home = 0x1b, [ = 0x5b, 1 = 0x31, ~ = 0x7e,
+		// end  = 0x1b, [ = 0x5b, 4 = 0x34, ~ = 0x7e,
+		// pageup   1b, [=5b, 5=35, ~=7e,
+		// pagedown 1b, [=5b, 6=36, ~=7e,
+
 		if (seq[0] == '[') {
+			if (seq[1] >= '0' && seq[1] <= '9') {
+				if (read(STDIN_FILENO, seq + 2, 1) == 0) {
+					return KEY_ESC;
+				}
+				if (seq[2] == '~') {
+					switch (seq[1]) {
+					case '1': return KEY_HOME;
+					case '4': return KEY_END;
+					case '5': return KEY_PAGEUP;
+					case '6': return KEY_PAGEDOWN;
+					}
+				}
+			}
 			switch (seq[1]) {
 			case 'A': return KEY_UP;
 			case 'B': return KEY_DOWN;
 			case 'C': return KEY_RIGHT;
 			case 'D': return KEY_LEFT;
-			case 'H': return KEY_HOME;
-			case 'F': return KEY_END;
+			case 'H': return KEY_HOME; // does not work with me?
+			case 'F': return KEY_END;  // ... same?
 			}
 		}
 		break;
 	}
 
-	//write(STDOUT_FILENO, &c, 1);
-	//printf("%x\n", (unsigned char)c);
 	return c;
 }
 
@@ -317,8 +358,7 @@ int read_key() {
  * to the buffer `b'.
  *
  * TODO: parameterize things like grouping of bytes and whatnot,
- * correctly! I.e. malloc the padding size dynamically based on
- * the width.
+ * correctly!
  */
 void render_contents(struct editor* e, struct buffer* b) {
 	char address[80];  // example: 000000040
@@ -342,7 +382,7 @@ void render_contents(struct editor* e, struct buffer* b) {
 	// to be displayed 'per screen'. I.e. if you can only display 1024
 	// bytes, you only have to read a maximum of 1024 bytes.
 	int bytes_per_screen = e->screen_rows * ec->octets_per_line;
-	int end_offset = bytes_per_screen + start_offset;
+	int end_offset = bytes_per_screen + start_offset - ec->octets_per_line;
 	if (end_offset > ec->content_length) {
 		end_offset = ec->content_length;
 	}
@@ -394,11 +434,18 @@ void render_contents(struct editor* e, struct buffer* b) {
 	// Check remainder of the last offset. If its bigger than zero,
 	// we got a last line to write (ASCII only).
 	if (offset % ec->octets_per_line > 0) {
-		char padding[980]; // padding characters, to align the ASCII.
-		memset(padding, ' ', sizeof(padding));
-		buffer_append(b, padding, (ec->octets_per_line* 2) + (ec->octets_per_line / ec->grouping) - row_char_count);
+		// Padding characters, to align the ASCII properly. For example, this
+		// could be the output at the end of the file:
+		// 000000420: 0a53 4f46 5457 4152 452e 0a              .SOFTWARE..
+		//                                       ^^^^^^^^^^^^
+		//                                       padding chars
+		int padding_size = (ec->octets_per_line * 2) + (ec->octets_per_line / ec->grouping) - row_char_count;
+		char* padding = malloc(padding_size * sizeof(char));
+		memset(padding, ' ', padding_size);
+		buffer_append(b, padding, padding_size);
 		buffer_append(b, "\e[1;32m  ", 10);
 		buffer_append(b, asc, strlen(asc));
+		free(padding);
 	}
 
 	// clear everything up until the end
@@ -458,25 +505,24 @@ void process_keypress(struct editor* ec) {
 	if (c == KEY_CTRL_Q) {
 		exit(0);
 	} else if (c == KEY_UP) {
-		if (ec->cursor_y > 0) {
-			ec->cursor_y--;
-		}
+		editor_scroll(ec, -1);
 	} else if (c == KEY_DOWN) {
-		int max_rows = ec->content_length / ec->octets_per_line;
-		if (ec->cursor_y < max_rows - ec->screen_rows + 2) {
-			ec->cursor_y++;
-		}
+		editor_scroll(ec, 1);
 	} else if (c == KEY_RIGHT) {
 	} else if (c == KEY_LEFT) {
 	} else if (c == KEY_HOME) {
-		ec->cursor_y -= 10;
+		ec->cursor_y = 0;
 	} else if (c == KEY_END) {
-		ec->cursor_y += 10;
+		editor_scroll(ec, ec->content_length); // some arbitrary high number
+	} else if (c == KEY_PAGEDOWN) {
+		editor_scroll(ec, ec->screen_rows - 2);
+	} else if (c == KEY_PAGEUP) {
+		editor_scroll(ec, -ec->screen_rows + 2);
 	} else {
 		editor_insert(ec, (char) c);
 	}
 
-	editor_statusmessage(ec, "Row: %d", ec->cursor_y);
+	editor_statusmessage(ec, "Cursor y at: %d", ec->cursor_y);
 }
 
 /**
@@ -504,6 +550,18 @@ void editor_free(struct editor* ec) {
 	free(ec);
 }
 
+void debug_keypress() {
+	char c;
+	ssize_t nread;
+	// check == 0 to see if EOF.
+	while ((nread = read(STDIN_FILENO, &c, 1))) {
+		if (c == 'q') { exit(1); };
+		if (c == '\r') { printf("\r\n"); continue; }
+		printf("%c=%02x, ", c, c);
+		fflush(stdout);
+	}
+}
+
 int main(int argc, char* argv[]) {
 	if (argc != 2) {
 		fprintf(stderr, "expected arg\n");
@@ -520,6 +578,7 @@ int main(int argc, char* argv[]) {
 	while (true) {
 		refresh_screen(ec);
 		process_keypress(ec);
+		//debug_keypress();
 	}
 
 	editor_free(ec);
