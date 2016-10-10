@@ -138,19 +138,17 @@ void clear_screen() {
  */
 void editor_move_cursor(struct editor* e, int dir) {
 	switch (dir) {
-	case KEY_LEFT:
-		e->cursor_x--;
-		break;
-	case KEY_RIGHT:
-		e->cursor_x++;
-		break;
+	case KEY_UP:    e->cursor_y--; break;
+	case KEY_DOWN:  e->cursor_y++; break;
+	case KEY_LEFT:  e->cursor_x--; break;
+	case KEY_RIGHT: e->cursor_x++; break;
 	}
 
 	if (e->cursor_x < 1) {
 		// move up a row.
 		e->cursor_x = 16;
 		e->cursor_y--;
-		if (e->cursor_y < 1) {
+		if (e->cursor_y < 1 && e->line == 1) {
 			e->cursor_y = 1;
 			editor_scroll(e, -1);
 		}
@@ -158,6 +156,14 @@ void editor_move_cursor(struct editor* e, int dir) {
 		// move down a row
 		e->cursor_x = 1;
 		e->cursor_y++;
+	}
+
+	if (e->cursor_y > e->screen_rows - 1) {
+		e->cursor_y = e->screen_rows - 1;
+		editor_scroll(e, 1);
+	} else if (e->cursor_y < 1) {
+		e->cursor_y = 1;
+		editor_scroll(e, -1);
 	}
 }
 
@@ -303,6 +309,27 @@ void editor_writefile(struct editor* e) {
 	editor_statusmessage(ec, "\"%s\", %d bytes written", ec->filename, ec->content_length);
 
 	fclose(fp);
+}
+
+/**
+ * Gets the current offset at which the cursor is, currently.
+ */
+inline int editor_offset_at_cursor(struct editor* e) {
+	// Calculate the offset based on the cursors' x and y coord (which is bound
+	// between (1 .. line width) and (1 .. max screen rows). Take the current displayed
+	// line into account (which is incremented when we are paging the content).
+	// Multiply it by octets_per_line since we're effectively addressing a one dimensional
+	// array.
+	int offset = (e->cursor_y - 1 + e->line) * e->octets_per_line + (e->cursor_x - 1);
+	// Safety measure. Since we're using the value of this function to
+	// index the content array, we must not go out of bounds.
+	if (offset <= 0) {
+		return 0;
+	}
+	if (offset >= e->content_length) {
+		return e->content_length;
+	}
+	return offset;
 }
 
 /**
@@ -500,17 +527,25 @@ void render_contents(struct editor* e, struct buffer* b) {
 	// clear everything up until the end
 	buffer_append(b, "\x1b[0J", 4);
 
-	char debug[80] = {0};
-	snprintf(debug, sizeof(debug), "\x1b[37m\x1b[1;80HRows: %d, start offset: %09x, end offset: %09x", ec->screen_rows, start_offset, end_offset);
-	buffer_append(b, debug, sizeof(debug));
+	int len = 256;
+	char debug[len];
+	memset(debug, 0, len);
+	snprintf(debug, len, "\x1b[37m\x1b[1;80HRows: %d, start offset: %09x, end offset: %09x", ec->screen_rows, start_offset, end_offset);
+	buffer_append(b, debug, len);
 
-	memset(debug, 0, sizeof(debug));
-	snprintf(debug, sizeof(debug), "\e[2;80H(row,col)=(%d,%d)", ec->cursor_y, ec->cursor_x);
-	buffer_append(b, debug, sizeof(debug));
+	memset(debug, 0, len);
+	snprintf(debug, len, "\e[2;80H(row,col)=(%d,%d)", ec->cursor_y, ec->cursor_x);
+	buffer_append(b, debug, len);
 
-	memset(debug, 0, sizeof(debug));
-	snprintf(debug, sizeof(debug), "\e[3;80HHex line width: %d", ec->hex_line_width);
-	buffer_append(b, debug, sizeof(debug));
+	memset(debug, 0, len);
+	snprintf(debug, len, "\e[3;80HHex line width: %d", ec->hex_line_width);
+	buffer_append(b, debug, len);
+
+	memset(debug, 0, len);
+	int curr_offset = editor_offset_at_cursor(ec);
+	snprintf(debug, len, "\e[4;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", ec->line, curr_offset, ec->contents[curr_offset]);
+	buffer_append(b, debug, len);
+
 }
 
 /**
@@ -560,6 +595,12 @@ void editor_insert(struct editor* ec, char x) {
 	ec->content_length++;
 }
 
+void editor_replace_byte(struct editor* e, char x) {
+	int offset = editor_offset_at_cursor(e);
+	e->contents[offset] = x;
+	editor_move_cursor(e, KEY_RIGHT);
+}
+
 /**
  * Processes a keypress accordingly.
  */
@@ -568,16 +609,18 @@ void process_keypress(struct editor* ec) {
 	switch (c) {
 	case KEY_CTRL_Q:   exit(0); break;
 	case KEY_CTRL_S:   editor_writefile(ec); break;
-	case KEY_UP:       editor_scroll(ec, -1); break;
-	case KEY_DOWN:     editor_scroll(ec, 1); break;
-	case KEY_RIGHT:    editor_move_cursor(ec, KEY_RIGHT); break;
-	case KEY_LEFT:     editor_move_cursor(ec, KEY_LEFT); break;
+
+	case KEY_UP:
+	case KEY_DOWN:
+	case KEY_RIGHT:
+	case KEY_LEFT:     editor_move_cursor(ec, c); break;
+
 	case KEY_HOME:     ec->line = 0; break;
 	case KEY_END:      editor_scroll(ec, ec->content_length); break;
 	case KEY_PAGEUP:   editor_scroll(ec, -(ec->screen_rows) + 2); break;
 	case KEY_PAGEDOWN: editor_scroll(ec, ec->screen_rows - 2); break;
 	default:
-		editor_insert(ec, (char) c);
+		editor_replace_byte(ec, (char)c);
 	}
 }
 
