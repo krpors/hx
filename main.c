@@ -51,6 +51,7 @@ void           editor_writefile(struct editor* e);
 void           editor_free(struct editor* ec);
 int            editor_statusmessage(struct editor* ec, const char* fmt, ...);
 void           editor_scroll(struct editor* e, int units);
+int            editor_offset_at_cursor(struct editor* e);
 
 // Global editor config.
 struct editor* ec;
@@ -144,24 +145,56 @@ void editor_move_cursor(struct editor* e, int dir) {
 	case KEY_RIGHT: e->cursor_x++; break;
 	}
 
-	if (e->cursor_x < 1) {
-		// move up a row.
-		e->cursor_x = 16;
-		e->cursor_y--;
-		if (e->cursor_y < 1 && e->line == 1) {
-			e->cursor_y = 1;
-			editor_scroll(e, -1);
-		}
-	} else if (e->cursor_x > 16) {
-		// move down a row
-		e->cursor_x = 1;
-		e->cursor_y++;
+	// Did we hit the start of the file? If so, stop moving and place
+	// the cursor on the top-left of the hex display.
+	if (e->cursor_x <= 1 && e->cursor_y <= 1 && e->line <= 0) {
+		ec->cursor_x = 1;
+		ec->cursor_y = 1;
+		return;
 	}
 
+	// Move the cursor over the x (columns) axis.
+	if (e->cursor_x < 1) {
+		// Are we trying to move left on the leftmost boundary?
+		//
+		// 000000000: 4d49 5420 4c69 6365 6e73 650a 0a43 6f70  MIT License..Cop
+		// 000000010: 7972 6967 6874 2028 6329 2032 3031 3620  yright (c) 2016
+		//            <--- [cursor goes to the left]
+		//
+		// Then we go up a row, cursor to the right. Like a text editor.
+		if (e->cursor_y > 1) {
+			e->cursor_y--;
+			e->cursor_x = e->octets_per_line;
+		}
+	} else if (e->cursor_x > e->octets_per_line) {
+		// Moving to the rightmost boundary?
+		//
+		// 000000000: 4d49 5420 4c69 6365 6e73 650a 0a43 6f70  MIT License..Cop
+		// 000000010: 7972 6967 6874 2028 6329 2032 3031 3620  yright (c) 2016
+		//                    [cursor goes to the right] --->
+		//
+		// Then move a line down, position the cursor to the beginning of the row.
+		e->cursor_y++;
+		e->cursor_x = 1;
+	}
+
+	// Did we try to move up when there's nothing? For example
+	//
+	//                       [up here]
+	// --------------------------^
+	// 000000000: 4d49 5420 4c69 6365 6e73 650a 0a43 6f70  MIT License..Cop
+	//
+	// Then stop moving upwards, do not scroll, return.
+	if (e->cursor_y <= 1 && e->line <= 0) {
+		e->cursor_y = 1;
+		return;
+	}
+
+	// Move the cursor over the y axis
 	if (e->cursor_y > e->screen_rows - 1) {
 		e->cursor_y = e->screen_rows - 1;
 		editor_scroll(e, 1);
-	} else if (e->cursor_y < 1) {
+	} else if (e->cursor_y < 1 && e->line > 0) {
 		e->cursor_y = 1;
 		editor_scroll(e, -1);
 	}
@@ -534,7 +567,7 @@ void render_contents(struct editor* e, struct buffer* b) {
 	buffer_append(b, debug, len);
 
 	memset(debug, 0, len);
-	snprintf(debug, len, "\e[2;80H(row,col)=(%d,%d)", ec->cursor_y, ec->cursor_x);
+	snprintf(debug, len, "\e[2;80H(cur_y,cur_x)=(%d,%d)", ec->cursor_y, ec->cursor_x);
 	buffer_append(b, debug, len);
 
 	memset(debug, 0, len);
@@ -543,7 +576,7 @@ void render_contents(struct editor* e, struct buffer* b) {
 
 	memset(debug, 0, len);
 	int curr_offset = editor_offset_at_cursor(ec);
-	snprintf(debug, len, "\e[4;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", ec->line, curr_offset, ec->contents[curr_offset]);
+	snprintf(debug, len, "\e[4;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", ec->line, curr_offset, (unsigned char) ec->contents[curr_offset]);
 	buffer_append(b, debug, len);
 
 }
