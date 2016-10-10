@@ -21,8 +21,13 @@ struct editor {
 	int octets_per_line;
 	int grouping;
 
-	int cursor_x;    // Cursor x pos
-	int cursor_y;    // Cursor y pos
+	int hex_line_width;  // the width in chars of a hex line, including
+	                     // grouping spaces.
+
+	int line; // The 'line' in the editor. Used for scrolling.
+
+	int cursor_x;    // Cursor x pos on the current screen
+	int cursor_y;    // Cursor y pos on the current screen
 	int screen_rows; // amount of screen rows after init
 	int screen_cols; // amount of screen columns after init
 
@@ -124,20 +129,35 @@ void clear_screen() {
 	}
 }
 
-void move_cursor(int dir) {
-	static const int LEN = 4;
-	char cruft[LEN];
-
+/**
+ * Moves the cursor. The terminal cursor positions are all 1-based, so we
+ * take that into account. When we scroll past boundaries (left, right, up
+ * and down) we react accordingly. Note that the cursor_x/y are also 1-based,
+ * and we calculate the actual position of the hex values by incrementing it
+ * later on with the address size, amount of grouping spaces etc.
+ */
+void editor_move_cursor(struct editor* e, int dir) {
 	switch (dir) {
-	case KEY_UP:    strncpy(cruft, "\x1b[1A", LEN); break;
-	case KEY_RIGHT: strncpy(cruft, "\x1b[1C", LEN); break;
-	case KEY_DOWN:  strncpy(cruft, "\x1b[1B", LEN); break;
-	case KEY_LEFT:  strncpy(cruft, "\x1b[1D", LEN); break;
-	default: return;
+	case KEY_LEFT:
+		e->cursor_x--;
+		break;
+	case KEY_RIGHT:
+		e->cursor_x++;
+		break;
 	}
 
-	if (write(STDOUT_FILENO, cruft, 4) == -1) {
-		perror("Cant write to stdout??");
+	if (e->cursor_x < 1) {
+		// move up a row.
+		e->cursor_x = 16;
+		e->cursor_y--;
+		if (e->cursor_y < 1) {
+			e->cursor_y = 1;
+			editor_scroll(e, -1);
+		}
+	} else if (e->cursor_x > 16) {
+		// move down a row
+		e->cursor_x = 1;
+		e->cursor_y++;
 	}
 }
 
@@ -258,7 +278,7 @@ void editor_openfile(struct editor* ec, const char* filename) {
 	strncpy(ec->filename, filename, strlen(filename));
 	ec->contents = contents;
 	ec->content_length = size;
-	editor_statusmessage(ec, "File opened: %s (%d bytes)", ec->filename, ec->content_length);
+	editor_statusmessage(ec, "\"%s\" (%d bytes)", ec->filename, ec->content_length);
 
 	fclose(fp);
 }
@@ -286,16 +306,16 @@ void editor_writefile(struct editor* e) {
 }
 
 /**
- * Scrolls the editor by updating the cursor_y accordingly, within
+ * Scrolls the editor by updating the `line' accordingly, within
  * the bounds of the readable parts of the buffer.
  */
 void editor_scroll(struct editor* e, int units) {
-	e->cursor_y += units;
+	e->line += units;
 
 	// if our cursor goes beyond the lower limit (which is 0, duh)
 	// then set our cursor position to just that.
-	if (e->cursor_y <= 0) {
-		e->cursor_y = 0;
+	if (e->line <= 0) {
+		e->line = 0;
 	}
 
 	// if our cursor goes beyond the upper limit, then set our cursor
@@ -303,8 +323,8 @@ void editor_scroll(struct editor* e, int units) {
 	// meaning (rows × columns), we have to calculate the upper limit of
 	// the cursor.
 	int upper_limit = e->content_length / e->octets_per_line;
-	if (e->cursor_y >= upper_limit) {
-		e->cursor_y = upper_limit;
+	if (e->line >= upper_limit) {
+		e->line = upper_limit;
 	}
 }
 
@@ -402,7 +422,7 @@ void render_contents(struct editor* e, struct buffer* b) {
 	// start_offset is to determine where we should start reading from
 	// the buffer. This is dependent on where the cursor is, and on the
 	// octets which are visible per line.
-	int start_offset = e->cursor_y * ec->octets_per_line;
+	int start_offset = e->line * ec->octets_per_line;
 	if (start_offset >= ec->content_length) {
 		start_offset = ec->content_length - ec->octets_per_line;
 	}
@@ -481,7 +501,15 @@ void render_contents(struct editor* e, struct buffer* b) {
 	buffer_append(b, "\x1b[0J", 4);
 
 	char debug[80] = {0};
-	snprintf(debug, sizeof(debug), "\x1b[37m\x1b[0;80HRows: %d, start offset: %09x, end offset: %09x", ec->screen_rows, start_offset, end_offset);
+	snprintf(debug, sizeof(debug), "\x1b[37m\x1b[1;80HRows: %d, start offset: %09x, end offset: %09x", ec->screen_rows, start_offset, end_offset);
+	buffer_append(b, debug, sizeof(debug));
+
+	memset(debug, 0, sizeof(debug));
+	snprintf(debug, sizeof(debug), "\e[2;80H(row,col)=(%d,%d)", ec->cursor_y, ec->cursor_x);
+	buffer_append(b, debug, sizeof(debug));
+
+	memset(debug, 0, sizeof(debug));
+	snprintf(debug, sizeof(debug), "\e[3;80HHex line width: %d", ec->hex_line_width);
 	buffer_append(b, debug, sizeof(debug));
 }
 
@@ -508,8 +536,14 @@ void refresh_screen(struct editor* ec) {
 	// Clear until the end of the line to the right
 	//buffer_append(b, "\x1b[0K", 4);
 
-	// Position cursor.
-	bw = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", 0, 0);
+	// Position cursor. This is done by taking into account the current
+	// cursor position (1 .. 40), and the amount of spaces to add due to
+	// grouping.
+	// TODO: this is currently a bit hacky and/or out of place.
+	int curx = (ec->cursor_x - 1) * 2; // times 2 characters to represent a byte in hex
+	int spaces = curx / (ec->grouping * 2); // determine spaces to add due to grouping.
+	int cruft = curx + spaces + 12; // 12 = the size of the address + ": "
+	bw = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", ec->cursor_y, cruft);
 	buffer_append(b, buf, bw);
 
 	buffer_draw(b);
@@ -536,9 +570,9 @@ void process_keypress(struct editor* ec) {
 	case KEY_CTRL_S:   editor_writefile(ec); break;
 	case KEY_UP:       editor_scroll(ec, -1); break;
 	case KEY_DOWN:     editor_scroll(ec, 1); break;
-	case KEY_RIGHT:    break;
-	case KEY_LEFT:     break;
-	case KEY_HOME:     ec->cursor_y = 0; break;
+	case KEY_RIGHT:    editor_move_cursor(ec, KEY_RIGHT); break;
+	case KEY_LEFT:     editor_move_cursor(ec, KEY_LEFT); break;
+	case KEY_HOME:     ec->line = 0; break;
 	case KEY_END:      editor_scroll(ec, ec->content_length); break;
 	case KEY_PAGEUP:   editor_scroll(ec, -(ec->screen_rows) + 2); break;
 	case KEY_PAGEDOWN: editor_scroll(ec, ec->screen_rows - 2); break;
@@ -555,9 +589,12 @@ struct editor* editor_init() {
 
 	ec->octets_per_line = 16;
 	ec->grouping = 2;
+	ec->hex_line_width = ec->octets_per_line * 2 + (ec->octets_per_line / 2) - 1;
 
-	ec->cursor_x = 0;
-	ec->cursor_y = 0;
+	ec->line = 0;
+
+	ec->cursor_x = 1;
+	ec->cursor_y = 1;
 	ec->filename = NULL;
 	ec->contents = NULL;
 	ec->content_length = 0;
