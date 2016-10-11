@@ -18,8 +18,8 @@
  * This struct contains internal information of the state of the editor.
  */
 struct editor {
-	int octets_per_line;
-	int grouping;
+	int octets_per_line; // Amount of octets (bytes) per line. Ideally multiple of 2.
+	int grouping;        // Amount of bytes per group. Ideally multiple of 2.
 
 	int hex_line_width;  // the width in chars of a hex line, including
 	                     // grouping spaces.
@@ -39,19 +39,24 @@ struct editor {
 	char statusmessage[80];  // status message
 };
 
-// Functions:
+// Utility functions.
 void enable_raw_mode();
 void disable_raw_mode();
 int read_key();
-void process_keypress(struct editor* ec);
 
+// editor functions:
 struct editor* editor_init();
-void           editor_openfile(struct editor* e, const char* filename);
-void           editor_writefile(struct editor* e);
-void           editor_free(struct editor* ec);
-int            editor_statusmessage(struct editor* ec, const char* fmt, ...);
-void           editor_scroll(struct editor* e, int units);
-int            editor_offset_at_cursor(struct editor* e);
+
+void editor_cursor_at_offset(struct editor* e, int offset, int* x, int *y);
+void editor_free(struct editor* ec);
+void editor_move_cursor(struct editor* e, int dir);
+int  editor_offset_at_cursor(struct editor* e);
+void editor_openfile(struct editor* e, const char* filename);
+void editor_process_keypress(struct editor* ec);
+void editor_refresh_screen(struct editor* ec);
+void editor_scroll(struct editor* e, int units);
+int  editor_statusmessage(struct editor* ec, const char* fmt, ...);
+void editor_writefile(struct editor* e);
 
 // Global editor config.
 struct editor* ec;
@@ -138,26 +143,12 @@ void clear_screen() {
  * later on with the address size, amount of grouping spaces etc.
  */
 void editor_move_cursor(struct editor* e, int dir) {
-	int prevx = e->cursor_x;
-	int prevy = e->cursor_y;
-
 	switch (dir) {
 	case KEY_UP:    e->cursor_y--; break;
 	case KEY_DOWN:  e->cursor_y++; break;
 	case KEY_LEFT:  e->cursor_x--; break;
 	case KEY_RIGHT: e->cursor_x++; break;
 	}
-
-	int off = editor_offset_at_cursor(e) + 2;
-	int cll = e->content_length;
-	char byte = e->contents[off];
-	fprintf(stderr, "Offset: %d, length: %d, byte: %02x\n", off, cll, byte);
-	if (off > cll) {
-		e->cursor_x = prevx;
-		e->cursor_y = prevy;
-		return;
-	}
-
 	// Did we hit the start of the file? If so, stop moving and place
 	// the cursor on the top-left of the hex display.
 	if (e->cursor_x <= 1 && e->cursor_y <= 1 && e->line <= 0) {
@@ -212,12 +203,18 @@ void editor_move_cursor(struct editor* e, int dir) {
 		editor_scroll(e, -1);
 	}
 
-	// Did we hit the end of the file, for example
-	//
-	// 000000000: 4d49 5420 4c69 6365 6e73 65              MIT License
-	//           [right most boundary] ----->
-	//
-	// Then stop moving.
+	// Did we hit the end of the file somehow? Set the cursor position
+	// to the maximum cursor position possible.
+	int offset = editor_offset_at_cursor(ec);
+	if (offset >= ec->content_length - 1) {
+		int maxx, maxy;
+		editor_cursor_at_offset(ec, offset, &maxx, &maxy);
+		e->cursor_x = maxx;
+		e->cursor_y = maxy;
+		return;
+	}
+
+
 }
 
 bool get_window_size(int* rows, int* cols) {
@@ -622,7 +619,7 @@ void render_contents(struct editor* e, struct buffer* b) {
  * eligible for display to an internal buffer, and then 'draws' it to the screen
  * in one call.
  */
-void refresh_screen(struct editor* ec) {
+void editor_refresh_screen(struct editor* ec) {
 	char buf[32]; // temp buffer for snprintf.
 	int bw; // bytes written by snprintf.
 	struct buffer* b = buffer_create();
@@ -673,7 +670,7 @@ void editor_replace_byte(struct editor* e, char x) {
 /**
  * Processes a keypress accordingly.
  */
-void process_keypress(struct editor* ec) {
+void editor_process_keypress(struct editor* ec) {
 	int c = read_key();
 	switch (c) {
 	case KEY_CTRL_Q:   exit(0); break;
@@ -747,8 +744,8 @@ int main(int argc, char* argv[]) {
 	clear_screen();
 
 	while (true) {
-		refresh_screen(ec);
-		process_keypress(ec);
+		editor_refresh_screen(ec);
+		editor_process_keypress(ec);
 		//debug_keypress();
 	}
 
