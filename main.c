@@ -138,11 +138,24 @@ void clear_screen() {
  * later on with the address size, amount of grouping spaces etc.
  */
 void editor_move_cursor(struct editor* e, int dir) {
+	int prevx = e->cursor_x;
+	int prevy = e->cursor_y;
+
 	switch (dir) {
 	case KEY_UP:    e->cursor_y--; break;
 	case KEY_DOWN:  e->cursor_y++; break;
 	case KEY_LEFT:  e->cursor_x--; break;
 	case KEY_RIGHT: e->cursor_x++; break;
+	}
+
+	int off = editor_offset_at_cursor(e) + 2;
+	int cll = e->content_length;
+	char byte = e->contents[off];
+	fprintf(stderr, "Offset: %d, length: %d, byte: %02x\n", off, cll, byte);
+	if (off > cll) {
+		e->cursor_x = prevx;
+		e->cursor_y = prevy;
+		return;
 	}
 
 	// Did we hit the start of the file? If so, stop moving and place
@@ -174,6 +187,7 @@ void editor_move_cursor(struct editor* e, int dir) {
 		//                    [cursor goes to the right] --->
 		//
 		// Then move a line down, position the cursor to the beginning of the row.
+		// Unless it's the end of file.
 		e->cursor_y++;
 		e->cursor_x = 1;
 	}
@@ -187,7 +201,6 @@ void editor_move_cursor(struct editor* e, int dir) {
 	// Then stop moving upwards, do not scroll, return.
 	if (e->cursor_y <= 1 && e->line <= 0) {
 		e->cursor_y = 1;
-		return;
 	}
 
 	// Move the cursor over the y axis
@@ -198,6 +211,13 @@ void editor_move_cursor(struct editor* e, int dir) {
 		e->cursor_y = 1;
 		editor_scroll(e, -1);
 	}
+
+	// Did we hit the end of the file, for example
+	//
+	// 000000000: 4d49 5420 4c69 6365 6e73 65              MIT License
+	//           [right most boundary] ----->
+	//
+	// Then stop moving.
 }
 
 bool get_window_size(int* rows, int* cols) {
@@ -345,6 +365,14 @@ void editor_writefile(struct editor* e) {
 }
 
 /**
+ * Finds the cursor position at the given offset, taking the lines into account.
+ */
+void editor_cursor_at_offset(struct editor* e, int offset, int* x, int* y) {
+	*x = offset % e->octets_per_line + 1;
+	*y = offset / e->octets_per_line - e->line + 1;
+}
+
+/**
  * Gets the current offset at which the cursor is, currently.
  */
 inline int editor_offset_at_cursor(struct editor* e) {
@@ -372,17 +400,17 @@ inline int editor_offset_at_cursor(struct editor* e) {
 void editor_scroll(struct editor* e, int units) {
 	e->line += units;
 
-	// if our cursor goes beyond the lower limit (which is 0, duh)
-	// then set our cursor position to just that.
+	// If we scroll past the beginning of the file (offset 0 of course),
+	// set our line to zero and return.
 	if (e->line <= 0) {
 		e->line = 0;
+		return;
 	}
 
-	// if our cursor goes beyond the upper limit, then set our cursor
-	// to the max. Since we are displaying data in a sort of matrix form,
-	// meaning (rows × columns), we have to calculate the upper limit of
-	// the cursor.
-	int upper_limit = e->content_length / e->octets_per_line;
+	// If we wanted to scroll past the end of the file, calculate the line
+	// properly. Subtract the amount of screen rows (minus 2??) to prevent
+	// scrolling past the end of file.
+	int upper_limit = e->content_length / e->octets_per_line - (e->screen_rows - 2);
 	if (e->line >= upper_limit) {
 		e->line = upper_limit;
 	}
@@ -578,6 +606,14 @@ void render_contents(struct editor* e, struct buffer* b) {
 	int curr_offset = editor_offset_at_cursor(ec);
 	snprintf(debug, len, "\e[4;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", ec->line, curr_offset, (unsigned char) ec->contents[curr_offset]);
 	buffer_append(b, debug, len);
+
+	memset(debug, 0, len);
+	int xx;
+	int yy;
+	editor_cursor_at_offset(ec, curr_offset, &xx, &yy);
+	snprintf(debug, len, "\e[5;80H\e[0Kyy,xx = %d, %d", yy, xx);
+	buffer_append(b, debug, len);
+
 
 }
 
