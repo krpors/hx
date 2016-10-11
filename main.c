@@ -162,7 +162,7 @@ void editor_move_cursor(struct editor* e, int dir) {
 		//            <--- [cursor goes to the left]
 		//
 		// Then we go up a row, cursor to the right. Like a text editor.
-		if (e->cursor_y > 1) {
+		if (e->cursor_y >= 1) {
 			e->cursor_y--;
 			e->cursor_x = e->octets_per_line;
 		}
@@ -360,7 +360,7 @@ inline int editor_offset_at_cursor(struct editor* e) {
 		return 0;
 	}
 	if (offset >= e->content_length) {
-		return e->content_length;
+		return e->content_length - 1;
 	}
 	return offset;
 }
