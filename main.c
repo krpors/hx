@@ -59,7 +59,7 @@ int  editor_statusmessage(struct editor* ec, const char* fmt, ...);
 void editor_writefile(struct editor* e);
 
 // Global editor config.
-struct editor* ec;
+struct editor* g_ec;
 
 // Terminal IO settings. Used to reset it when exiting to prevent terminal
 // data garbling. Declared global since we require it in the atexit() call.
@@ -122,9 +122,9 @@ void enable_raw_mode() {
 }
 
 void disable_raw_mode() {
-	editor_free(ec);
+	editor_free(g_ec);
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-	printf("\x1b[2J\x1b[7mThank you for using hx!\x1b[0m\x1b[0K\r\n");
+	printf("\x1b[2J\x1b[7m\rThank you for using hx!\x1b[0m\x1b[0K\r\n");
 	fflush(stdout);
 }
 
@@ -141,6 +141,8 @@ void clear_screen() {
  * and down) we react accordingly. Note that the cursor_x/y are also 1-based,
  * and we calculate the actual position of the hex values by incrementing it
  * later on with the address size, amount of grouping spaces etc.
+ *
+ * This function looks convoluted as hell, but it works...
  */
 void editor_move_cursor(struct editor* e, int dir) {
 	switch (dir) {
@@ -152,8 +154,8 @@ void editor_move_cursor(struct editor* e, int dir) {
 	// Did we hit the start of the file? If so, stop moving and place
 	// the cursor on the top-left of the hex display.
 	if (e->cursor_x <= 1 && e->cursor_y <= 1 && e->line <= 0) {
-		ec->cursor_x = 1;
-		ec->cursor_y = 1;
+		e->cursor_x = 1;
+		e->cursor_y = 1;
 		return;
 	}
 
@@ -205,10 +207,10 @@ void editor_move_cursor(struct editor* e, int dir) {
 
 	// Did we hit the end of the file somehow? Set the cursor position
 	// to the maximum cursor position possible.
-	int offset = editor_offset_at_cursor(ec);
-	if (offset >= ec->content_length - 1) {
+	int offset = editor_offset_at_cursor(e);
+	if (offset >= e->content_length - 1) {
 		int maxx, maxy;
-		editor_cursor_at_offset(ec, offset, &maxx, &maxy);
+		editor_cursor_at_offset(e, offset, &maxx, &maxy);
 		e->cursor_x = maxx;
 		e->cursor_y = maxy;
 		return;
@@ -298,7 +300,7 @@ void buffer_draw(struct buffer* buf) {
  * The editor struct is used to contain the contents and other metadata
  * about the file being opened.
  */
-void editor_openfile(struct editor* ec, const char* filename) {
+void editor_openfile(struct editor* e, const char* filename) {
 	FILE* fp = fopen(filename, "rb");
 	if (fp == NULL) {
 		perror("Opening file");
@@ -330,11 +332,11 @@ void editor_openfile(struct editor* ec, const char* filename) {
 		exit(1);
 	}
 
-	ec->filename = malloc(strlen(filename));
-	strncpy(ec->filename, filename, strlen(filename));
-	ec->contents = contents;
-	ec->content_length = size;
-	editor_statusmessage(ec, "\"%s\" (%d bytes)", ec->filename, ec->content_length);
+	e->filename = malloc(strlen(filename));
+	strncpy(e->filename, filename, strlen(filename));
+	e->contents = contents;
+	e->content_length = size;
+	editor_statusmessage(e, "\"%s\" (%d bytes)", e->filename, e->content_length);
 
 	fclose(fp);
 }
@@ -347,16 +349,16 @@ void editor_writefile(struct editor* e) {
 
 	FILE* fp = fopen(e->filename, "w");
 	if (fp == NULL) {
-		editor_statusmessage(ec, "Unable to open '%s' for writing", e->filename);
+		editor_statusmessage(e, "Unable to open '%s' for writing", e->filename);
 		return;
 	}
 
 	size_t bw = fwrite(e->contents, sizeof(char), e->content_length, fp);
 	if (bw <= 0) {
-		editor_statusmessage(ec, "Couldn't write to file!!");
+		editor_statusmessage(e, "Couldn't write to file!!");
 	}
 
-	editor_statusmessage(ec, "\"%s\", %d bytes written", ec->filename, ec->content_length);
+	editor_statusmessage(e, "\"%s\", %d bytes written", e->filename, e->content_length);
 
 	fclose(fp);
 }
@@ -507,23 +509,23 @@ void render_contents(struct editor* e, struct buffer* b) {
 	// start_offset is to determine where we should start reading from
 	// the buffer. This is dependent on where the cursor is, and on the
 	// octets which are visible per line.
-	int start_offset = e->line * ec->octets_per_line;
-	if (start_offset >= ec->content_length) {
-		start_offset = ec->content_length - ec->octets_per_line;
+	int start_offset = e->line * e->octets_per_line;
+	if (start_offset >= e->content_length) {
+		start_offset = e->content_length - e->octets_per_line;
 	}
 
 	// Determine the end offset for displaying. There is only so much
 	// to be displayed 'per screen'. I.e. if you can only display 1024
 	// bytes, you only have to read a maximum of 1024 bytes.
-	int bytes_per_screen = e->screen_rows * ec->octets_per_line;
-	int end_offset = bytes_per_screen + start_offset - ec->octets_per_line;
-	if (end_offset > ec->content_length) {
-		end_offset = ec->content_length;
+	int bytes_per_screen = e->screen_rows * e->octets_per_line;
+	int end_offset = bytes_per_screen + start_offset - e->octets_per_line;
+	if (end_offset > e->content_length) {
+		end_offset = e->content_length;
 	}
 
 	int offset;
 	for (offset = start_offset; offset < end_offset; offset++) {
-		if (offset % ec->octets_per_line == 0) {
+		if (offset % e->octets_per_line == 0) {
 			// start of a new row, beginning with an offset address in hex.
 			int bwritten = snprintf(address, sizeof(address), "\e[0;33m%09x\e[0m:", offset);
 			buffer_append(b, address, bwritten);
@@ -539,14 +541,14 @@ void render_contents(struct editor* e, struct buffer* b) {
 		// 16 bytes are set. This will be written later when the hex
 		// values are drawn to screen.
 		if (isprint(e->contents[offset])) {
-			asc[offset % ec->octets_per_line] = e->contents[offset];
+			asc[offset % e->octets_per_line] = e->contents[offset];
 		} else {
 			// non-printable characters are represented by a dot.
-			asc[offset % ec->octets_per_line] = '.';
+			asc[offset % e->octets_per_line] = '.';
 		}
 
 		// Every 'group' count, write a separator space.
-		if (offset % ec->grouping == 0) {
+		if (offset % e->grouping == 0) {
 			buffer_append(b, " ", 1);
 			row_char_count++;
 		}
@@ -557,7 +559,7 @@ void render_contents(struct editor* e, struct buffer* b) {
 
 		// If we reached the end of a 'row', start writing the ASCII equivalents
 		// of the 'row', in a different color. Then hit CRLF to go to the next line.
-		if ((offset+1) % ec->octets_per_line == 0) {
+		if ((offset+1) % e->octets_per_line == 0) {
 			buffer_append(b, "\e[1;32m", 8);
 			buffer_append(b, "  ", 2);
 			buffer_append(b, asc, strlen(asc));
@@ -567,13 +569,13 @@ void render_contents(struct editor* e, struct buffer* b) {
 
 	// Check remainder of the last offset. If its bigger than zero,
 	// we got a last line to write (ASCII only).
-	if (offset % ec->octets_per_line > 0) {
+	if (offset % e->octets_per_line > 0) {
 		// Padding characters, to align the ASCII properly. For example, this
 		// could be the output at the end of the file:
 		// 000000420: 0a53 4f46 5457 4152 452e 0a              .SOFTWARE..
 		//                                       ^^^^^^^^^^^^
 		//                                       padding chars
-		int padding_size = (ec->octets_per_line * 2) + (ec->octets_per_line / ec->grouping) - row_char_count;
+		int padding_size = (e->octets_per_line * 2) + (e->octets_per_line / e->grouping) - row_char_count;
 		char* padding = malloc(padding_size * sizeof(char));
 		memset(padding, ' ', padding_size);
 		buffer_append(b, padding, padding_size);
@@ -588,26 +590,26 @@ void render_contents(struct editor* e, struct buffer* b) {
 	int len = 256;
 	char debug[len];
 	memset(debug, 0, len);
-	snprintf(debug, len, "\x1b[37m\x1b[1;80HRows: %d, start offset: %09x, end offset: %09x", ec->screen_rows, start_offset, end_offset);
+	snprintf(debug, len, "\x1b[37m\x1b[1;80HRows: %d, start offset: %09x, end offset: %09x", e->screen_rows, start_offset, end_offset);
 	buffer_append(b, debug, len);
 
 	memset(debug, 0, len);
-	snprintf(debug, len, "\e[2;80H(cur_y,cur_x)=(%d,%d)", ec->cursor_y, ec->cursor_x);
+	snprintf(debug, len, "\e[2;80H(cur_y,cur_x)=(%d,%d)", e->cursor_y, e->cursor_x);
 	buffer_append(b, debug, len);
 
 	memset(debug, 0, len);
-	snprintf(debug, len, "\e[3;80HHex line width: %d", ec->hex_line_width);
+	snprintf(debug, len, "\e[3;80HHex line width: %d", e->hex_line_width);
 	buffer_append(b, debug, len);
 
 	memset(debug, 0, len);
-	int curr_offset = editor_offset_at_cursor(ec);
-	snprintf(debug, len, "\e[4;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", ec->line, curr_offset, (unsigned char) ec->contents[curr_offset]);
+	int curr_offset = editor_offset_at_cursor(e);
+	snprintf(debug, len, "\e[4;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", e->line, curr_offset, (unsigned char) e->contents[curr_offset]);
 	buffer_append(b, debug, len);
 
 	memset(debug, 0, len);
 	int xx;
 	int yy;
-	editor_cursor_at_offset(ec, curr_offset, &xx, &yy);
+	editor_cursor_at_offset(e, curr_offset, &xx, &yy);
 	snprintf(debug, len, "\e[5;80H\e[0Kyy,xx = %d, %d", yy, xx);
 	buffer_append(b, debug, len);
 
@@ -619,21 +621,21 @@ void render_contents(struct editor* e, struct buffer* b) {
  * eligible for display to an internal buffer, and then 'draws' it to the screen
  * in one call.
  */
-void editor_refresh_screen(struct editor* ec) {
+void editor_refresh_screen(struct editor* e) {
 	char buf[32]; // temp buffer for snprintf.
 	int bw; // bytes written by snprintf.
 	struct buffer* b = buffer_create();
 
 	buffer_append(b, "\x1b[H", 3); // move the cursor top left
 
-	render_contents(ec, b);
+	render_contents(e, b);
 
 	// Move down to write the status message.
-	bw = snprintf(buf, sizeof(buf), "\x1b[%d;0H", ec->screen_rows);
+	bw = snprintf(buf, sizeof(buf), "\x1b[%d;0H", e->screen_rows);
 	buffer_append(b, buf, bw);
 	// Change the color
 	buffer_append(b, "\x1b[0;30;47m", 10);
-	buffer_append(b, ec->statusmessage, strlen(ec->statusmessage));
+	buffer_append(b, e->statusmessage, strlen(e->statusmessage));
 	// Clear until the end of the line to the right
 	//buffer_append(b, "\x1b[0K", 4);
 
@@ -641,24 +643,24 @@ void editor_refresh_screen(struct editor* ec) {
 	// cursor position (1 .. 40), and the amount of spaces to add due to
 	// grouping.
 	// TODO: this is currently a bit hacky and/or out of place.
-	int curx = (ec->cursor_x - 1) * 2; // times 2 characters to represent a byte in hex
-	int spaces = curx / (ec->grouping * 2); // determine spaces to add due to grouping.
+	int curx = (e->cursor_x - 1) * 2; // times 2 characters to represent a byte in hex
+	int spaces = curx / (e->grouping * 2); // determine spaces to add due to grouping.
 	int cruft = curx + spaces + 12; // 12 = the size of the address + ": "
-	bw = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", ec->cursor_y, cruft);
+	bw = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", e->cursor_y, cruft);
 	buffer_append(b, buf, bw);
 
 	buffer_draw(b);
 	buffer_free(b);
 }
 
-void editor_insert(struct editor* ec, char x) {
+void editor_insert(struct editor* e, char x) {
 	// We are inserting a single character. Reallocate memory to contain
 	// this extra byte.
-	ec->contents = realloc(ec->contents, ec->content_length + 1);
+	e->contents = realloc(e->contents, e->content_length + 1);
 	// Set the last allocated index to the character x.
-	ec->contents[ec->content_length] = x;
+	e->contents[e->content_length] = x;
 	// Increase the content length since we inserted a character.
-	ec->content_length++;
+	e->content_length++;
 }
 
 void editor_replace_byte(struct editor* e, char x) {
@@ -670,23 +672,23 @@ void editor_replace_byte(struct editor* e, char x) {
 /**
  * Processes a keypress accordingly.
  */
-void editor_process_keypress(struct editor* ec) {
+void editor_process_keypress(struct editor* e) {
 	int c = read_key();
 	switch (c) {
 	case KEY_CTRL_Q:   exit(0); break;
-	case KEY_CTRL_S:   editor_writefile(ec); break;
+	case KEY_CTRL_S:   editor_writefile(e); break;
 
 	case KEY_UP:
 	case KEY_DOWN:
 	case KEY_RIGHT:
-	case KEY_LEFT:     editor_move_cursor(ec, c); break;
+	case KEY_LEFT:     editor_move_cursor(e, c); break;
 
-	case KEY_HOME:     ec->line = 0; break;
-	case KEY_END:      editor_scroll(ec, ec->content_length); break;
-	case KEY_PAGEUP:   editor_scroll(ec, -(ec->screen_rows) + 2); break;
-	case KEY_PAGEDOWN: editor_scroll(ec, ec->screen_rows - 2); break;
+	case KEY_HOME:     e->line = 0; break;
+	case KEY_END:      editor_scroll(e, e->content_length); break;
+	case KEY_PAGEUP:   editor_scroll(e, -(e->screen_rows) + 2); break;
+	case KEY_PAGEDOWN: editor_scroll(e, e->screen_rows - 2); break;
 	default:
-		editor_replace_byte(ec, (char)c);
+		editor_replace_byte(e, (char)c);
 	}
 }
 
@@ -694,28 +696,28 @@ void editor_process_keypress(struct editor* ec) {
  * Initializes editor struct with some default values.
  */
 struct editor* editor_init() {
-	struct editor* ec = malloc(sizeof(struct editor));
+	struct editor* e = malloc(sizeof(struct editor));
 
-	ec->octets_per_line = 16;
-	ec->grouping = 2;
-	ec->hex_line_width = ec->octets_per_line * 2 + (ec->octets_per_line / 2) - 1;
+	e->octets_per_line = 16;
+	e->grouping = 2;
+	e->hex_line_width = e->octets_per_line * 2 + (e->octets_per_line / 2) - 1;
 
-	ec->line = 0;
+	e->line = 0;
 
-	ec->cursor_x = 1;
-	ec->cursor_y = 1;
-	ec->filename = NULL;
-	ec->contents = NULL;
-	ec->content_length = 0;
-	get_window_size(&(ec->screen_rows), &(ec->screen_cols));
+	e->cursor_x = 1;
+	e->cursor_y = 1;
+	e->filename = NULL;
+	e->contents = NULL;
+	e->content_length = 0;
+	get_window_size(&(e->screen_rows), &(e->screen_cols));
 
-	return ec;
+	return e;
 }
 
-void editor_free(struct editor* ec) {
-	free(ec->filename);
-	free(ec->contents);
-	free(ec);
+void editor_free(struct editor* e) {
+	free(e->filename);
+	free(e->contents);
+	free(e);
 }
 
 void debug_keypress() {
@@ -737,19 +739,19 @@ int main(int argc, char* argv[]) {
 	}
 
 	// Editor configuration passed around.
-	ec = editor_init();
-	editor_openfile(ec, argv[1]);
+	g_ec = editor_init();
+	editor_openfile(g_ec, argv[1]);
 
 	enable_raw_mode();
 	clear_screen();
 
 	while (true) {
-		editor_refresh_screen(ec);
-		editor_process_keypress(ec);
+		editor_refresh_screen(g_ec);
+		editor_process_keypress(g_ec);
 		//debug_keypress();
 	}
 
-	editor_free(ec);
+	editor_free(g_ec);
 	return EXIT_SUCCESS;
 }
 
