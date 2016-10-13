@@ -209,14 +209,9 @@ void editor_move_cursor(struct editor* e, int dir) {
 	// to the maximum cursor position possible.
 	int offset = editor_offset_at_cursor(e);
 	if (offset >= e->content_length - 1) {
-		int maxx, maxy;
-		editor_cursor_at_offset(e, offset, &maxx, &maxy);
-		e->cursor_x = maxx;
-		e->cursor_y = maxy;
+		editor_cursor_at_offset(e, offset, &e->cursor_x, &e->cursor_y);
 		return;
 	}
-
-
 }
 
 bool get_window_size(int* rows, int* cols) {
@@ -399,19 +394,22 @@ inline int editor_offset_at_cursor(struct editor* e) {
 void editor_scroll(struct editor* e, int units) {
 	e->line += units;
 
-	// If we scroll past the beginning of the file (offset 0 of course),
-	// set our line to zero and return.
-	if (e->line <= 0) {
-		e->line = 0;
-		return;
-	}
-
 	// If we wanted to scroll past the end of the file, calculate the line
 	// properly. Subtract the amount of screen rows (minus 2??) to prevent
 	// scrolling past the end of file.
 	int upper_limit = e->content_length / e->octets_per_line - (e->screen_rows - 2);
 	if (e->line >= upper_limit) {
 		e->line = upper_limit;
+	}
+
+	// If we scroll past the beginning of the file (offset 0 of course),
+	// set our line to zero and return. This particular condition is also
+	// necessary when the upper_limit calculated goes negative, because
+	// This is either some weird calculation failure from my part, but
+	// this seems to work. Failing to cap this will result in bad addressing
+	// of the content in render_contents().
+	if (e->line <= 0) {
+		e->line = 0;
 	}
 }
 
@@ -754,7 +752,3 @@ int main(int argc, char* argv[]) {
 	editor_free(g_ec);
 	return EXIT_SUCCESS;
 }
-
-/*
-0000000: 65 AF EF AA CC AA BB AA FF  A.....A.A.
-*/
