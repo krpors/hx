@@ -14,6 +14,12 @@
 
 // Declarations.
 
+enum editor_mode {
+	MODE_NORMAL,  // normal mode i.e. for navigating, commands.
+	MODE_INSERT,  // insert values at cursor position.
+	MODE_REPLACE, // replace values at cursor position.
+};
+
 /**
  * This struct contains internal information of the state of the editor.
  */
@@ -24,17 +30,17 @@ struct editor {
 	int hex_line_width;  // the width in chars of a hex line, including
 	                     // grouping spaces.
 
-	int line; // The 'line' in the editor. Used for scrolling.
-
+	int line;        // The 'line' in the editor. Used for scrolling.
 	int cursor_x;    // Cursor x pos on the current screen
 	int cursor_y;    // Cursor y pos on the current screen
 	int screen_rows; // amount of screen rows after init
 	int screen_cols; // amount of screen columns after init
 
-	bool  dirty;          // whether the buffer is modified
-	char* filename;       // the filename currently open
-	char* contents;       // the file's contents
-	int   content_length; // length of the contents
+	enum editor_mode mode;           // mode the editor is in
+	bool             dirty;          // whether the buffer is modified
+	char*            filename;       // the filename currently open
+	char*            contents;       // the file's contents
+	int              content_length; // length of the contents
 
 	char statusmessage[80];  // status message
 };
@@ -42,6 +48,7 @@ struct editor {
 // Utility functions.
 void enable_raw_mode();
 void disable_raw_mode();
+void clear_screen();
 int read_key();
 
 // editor functions:
@@ -49,12 +56,13 @@ struct editor* editor_init();
 
 void editor_cursor_at_offset(struct editor* e, int offset, int* x, int *y);
 void editor_free(struct editor* ec);
-void editor_move_cursor(struct editor* e, int dir);
+void editor_move_cursor(struct editor* e, int dir, int amount);
 int  editor_offset_at_cursor(struct editor* e);
 void editor_openfile(struct editor* e, const char* filename);
 void editor_process_keypress(struct editor* ec);
 void editor_refresh_screen(struct editor* ec);
 void editor_scroll(struct editor* e, int units);
+void editor_setmode(struct editor *e, enum editor_mode mode);
 int  editor_statusmessage(struct editor* ec, const char* fmt, ...);
 void editor_writefile(struct editor* e);
 
@@ -66,7 +74,7 @@ struct editor* g_ec;
 struct termios orig_termios;
 
 // Key enumerations
-enum KEY_CODES {
+enum key_codes {
 	KEY_NULL     = 0,
 	KEY_CTRL_Q   = 0x11, // DC1, to exit the program.
 	KEY_CTRL_S   = 0x13, // DC2, to save the current buffer.
@@ -111,12 +119,11 @@ void enable_raw_mode() {
 	// Return each byte, or zero for timeout.
 	raw.c_cc[VMIN] = 0;
 	// 100 ms timeout (unit is tens of second).
-	raw.c_cc[VTIME] = 1;
+	raw.c_cc[VTIME] = 0;
 
     // put terminal in raw mode after flushing
-	int x = tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw);
-	if (x != 0) {
-		perror("Unable to set terminal attributes");
+	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) != 0) {
+		perror("Unable to set terminal to raw mode");
 		exit(1);
 	}
 }
@@ -124,13 +131,12 @@ void enable_raw_mode() {
 void disable_raw_mode() {
 	editor_free(g_ec);
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-	printf("\x1b[2J\x1b[7m\rThank you for using hx!\x1b[0m\x1b[0K\r\n");
-	fflush(stdout);
+	clear_screen();
 }
 
 
 void clear_screen() {
-	if (write(STDOUT_FILENO, "\x1b[2J", 4) == -1) {
+	if (write(STDOUT_FILENO, "\x1b[2J\n", 5) == -1) {
 		perror("Unable to clear screen");
 	}
 }
@@ -144,12 +150,12 @@ void clear_screen() {
  *
  * This function looks convoluted as hell, but it works...
  */
-void editor_move_cursor(struct editor* e, int dir) {
+void editor_move_cursor(struct editor* e, int dir, int amount) {
 	switch (dir) {
-	case KEY_UP:    e->cursor_y--; break;
-	case KEY_DOWN:  e->cursor_y++; break;
-	case KEY_LEFT:  e->cursor_x--; break;
-	case KEY_RIGHT: e->cursor_x++; break;
+	case KEY_UP:    e->cursor_y-=amount; break;
+	case KEY_DOWN:  e->cursor_y+=amount; break;
+	case KEY_LEFT:  e->cursor_x-=amount; break;
+	case KEY_RIGHT: e->cursor_x+=amount; break;
 	}
 	// Did we hit the start of the file? If so, stop moving and place
 	// the cursor on the top-left of the hex display.
@@ -360,6 +366,10 @@ void editor_writefile(struct editor* e) {
 
 /**
  * Finds the cursor position at the given offset, taking the lines into account.
+ * The result is set to the pointers `x' and `y'. We can therefore 'misuse' this
+ * to set the cursor position of the editor to a given offset.
+ *
+ * Note that this function will NOT scroll the editor to the proper line.
  */
 void editor_cursor_at_offset(struct editor* e, int offset, int* x, int* y) {
 	*x = offset % e->octets_per_line + 1;
@@ -410,6 +420,16 @@ void editor_scroll(struct editor* e, int units) {
 	// of the content in render_contents().
 	if (e->line <= 0) {
 		e->line = 0;
+	}
+}
+
+void editor_setmode(struct editor* e, enum editor_mode mode) {
+	e->mode = mode;
+	switch (e->mode) {
+	case MODE_NORMAL:  editor_statusmessage(e, ""); break;
+	case MODE_INSERT:  editor_statusmessage(e, "-- INSERT --"); break;
+	case MODE_REPLACE: editor_statusmessage(e, "-- REPLACE --"); break;
+	default: break;
 	}
 }
 
@@ -664,7 +684,7 @@ void editor_insert(struct editor* e, char x) {
 void editor_replace_byte(struct editor* e, char x) {
 	int offset = editor_offset_at_cursor(e);
 	e->contents[offset] = x;
-	editor_move_cursor(e, KEY_RIGHT);
+	editor_move_cursor(e, KEY_RIGHT, 1);
 }
 
 /**
@@ -672,24 +692,68 @@ void editor_replace_byte(struct editor* e, char x) {
  */
 void editor_process_keypress(struct editor* e) {
 	int c = read_key();
+
+	// Handle some keys, independent of mode we're in.
 	switch (c) {
-	case KEY_CTRL_Q:   exit(0); break;
-	case KEY_CTRL_S:   editor_writefile(e); break;
+	case KEY_ESC: editor_setmode(e, MODE_NORMAL); return;
+	case KEY_CTRL_Q:   exit(0); return;
+	case KEY_CTRL_S:   editor_writefile(e); return;
 
 	case KEY_UP:
 	case KEY_DOWN:
 	case KEY_RIGHT:
-	case KEY_LEFT:     editor_move_cursor(e, c); break;
+	case KEY_LEFT:     editor_move_cursor(e, c, 1); return;
 
-	case KEY_HOME:     e->line = 0; break;
-	case KEY_END:      editor_scroll(e, e->content_length); break;
-	case KEY_PAGEUP:   editor_scroll(e, -(e->screen_rows) + 2); break;
-	case KEY_PAGEDOWN: editor_scroll(e, e->screen_rows - 2); break;
-	default:
-		editor_replace_byte(e, (char)c);
+	case KEY_HOME:     e->cursor_x = 1; return;
+	case KEY_END:      e->cursor_x = e->octets_per_line; return;
+	case KEY_PAGEUP:   editor_scroll(e, -(e->screen_rows) + 2); return;
+	case KEY_PAGEDOWN: editor_scroll(e, e->screen_rows - 2); return;
+	}
+
+	// Handle commands when in normal mode.
+	if (e->mode == MODE_NORMAL) {
+		switch (c) {
+		// vi(m) like movement:
+		case 'h': editor_move_cursor(e, KEY_LEFT,  1); break;
+		case 'j': editor_move_cursor(e, KEY_DOWN,  1); break;
+		case 'k': editor_move_cursor(e, KEY_UP,    1); break;
+		case 'l': editor_move_cursor(e, KEY_RIGHT, 1); break;
+		case 'i':
+			editor_setmode(e, MODE_INSERT); break;
+		case 'r':
+			editor_setmode(e, MODE_REPLACE); break;
+		case 'b':
+			// Move one group back.
+			editor_move_cursor(e, KEY_LEFT, e->grouping); break;
+		case 'w':
+			// Move one group further.
+			editor_move_cursor(e, KEY_RIGHT, e->grouping); break;
+		case 'G':
+			// Scroll to the end, place the cursor at the end.
+			editor_scroll(e, e->content_length);
+			editor_cursor_at_offset(e, e->content_length-1, &e->cursor_x, &e->cursor_y);
+			break;
+		case 'g':
+			// Read extra keypress
+			c = read_key();
+			if (c == 'g') {
+				// scroll to the start, place cursor at start.
+				e->line = 0;
+				editor_cursor_at_offset(e, 0, &e->cursor_x, &e->cursor_y);
+			}
+		}
+
+		// Command parsed, do not continue.
+		return;
+	}
+
+	// Actual edit mode.
+	if (e->mode == MODE_INSERT) {
+		editor_insert(e, (char) c);
+	} else if (e->mode == MODE_REPLACE) {
+		editor_replace_byte(e, (char) c);
 	}
 }
-
 /**
  * Initializes editor struct with some default values.
  */
@@ -701,12 +765,14 @@ struct editor* editor_init() {
 	e->hex_line_width = e->octets_per_line * 2 + (e->octets_per_line / 2) - 1;
 
 	e->line = 0;
-
 	e->cursor_x = 1;
 	e->cursor_y = 1;
 	e->filename = NULL;
 	e->contents = NULL;
 	e->content_length = 0;
+
+	e->mode = MODE_NORMAL;
+
 	get_window_size(&(e->screen_rows), &(e->screen_cols));
 
 	return e;
@@ -724,13 +790,21 @@ void debug_keypress() {
 	// check == 0 to see if EOF.
 	while ((nread = read(STDIN_FILENO, &c, 1))) {
 		if (c == 'q') { exit(1); };
-		if (c == '\r') { printf("\r\n"); continue; }
-		printf("%c=%02x, ", c, c);
+		if (c == '\r' || c == '\n') { printf("\r\n"); continue; }
+		if (isprint(c)) {
+			printf("%c = %02x, ", c, c);
+		} else {
+			printf(". = %02x, ", c);
+		}
 		fflush(stdout);
 	}
 }
 
 int main(int argc, char* argv[]) {
+	if (argc == 1) {
+		debug_keypress();
+		exit(0);
+	}
 	if (argc != 2) {
 		fprintf(stderr, "expected arg\n");
 		exit(2);
