@@ -55,6 +55,7 @@ int read_key();
 struct editor* editor_init();
 
 void editor_cursor_at_offset(struct editor* e, int offset, int* x, int *y);
+void editor_delete_char_at_cursor(struct editor* e);
 void editor_free(struct editor* ec);
 void editor_move_cursor(struct editor* e, int dir, int amount);
 int  editor_offset_at_cursor(struct editor* e);
@@ -377,6 +378,25 @@ void editor_cursor_at_offset(struct editor* e, int offset, int* x, int* y) {
 }
 
 /**
+ * Deletes the character (byte) at the current cursor position (in other
+ * words, the current offset the cursor is at).
+ */
+void editor_delete_char_at_cursor(struct editor* e) {
+	int offset = editor_offset_at_cursor(e);
+
+	// FIXME: when all chars have been removed from a file, this blows up.
+
+	// Remove an element from the contents buffer by moving memory.
+	// The character at the current offset is supposed to be removed.
+	// Take the offset + 1, until the end of the buffer. Copy that
+	// part over the offset, reallocate the contents buffer with one
+	// character in size less.
+	memmove(e->contents + offset, e->contents + offset + 1 , e->content_length - offset - 1);
+	e->contents = realloc(e->contents, e->content_length - 1);
+	e->content_length--;
+}
+
+/**
  * Gets the current offset at which the cursor is, currently.
  */
 inline int editor_offset_at_cursor(struct editor* e) {
@@ -429,13 +449,13 @@ void editor_setmode(struct editor* e, enum editor_mode mode) {
 	case MODE_NORMAL:  editor_statusmessage(e, ""); break;
 	case MODE_INSERT:  editor_statusmessage(e, "-- INSERT --"); break;
 	case MODE_REPLACE: editor_statusmessage(e, "-- REPLACE --"); break;
-	default: break;
 	}
 }
 
 int editor_statusmessage(struct editor* e, const char* fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
+	// TODO valgrind complains here
 	int x = vsnprintf(e->statusmessage, sizeof(e->statusmessage), fmt, ap);
 	va_end(ap);
 	return x;
@@ -718,6 +738,9 @@ void editor_process_keypress(struct editor* e) {
 		case 'j': editor_move_cursor(e, KEY_DOWN,  1); break;
 		case 'k': editor_move_cursor(e, KEY_UP,    1); break;
 		case 'l': editor_move_cursor(e, KEY_RIGHT, 1); break;
+		case 'x':
+			editor_delete_char_at_cursor(e);
+			break;
 		case 'i':
 			editor_setmode(e, MODE_INSERT); break;
 		case 'r':
@@ -741,6 +764,7 @@ void editor_process_keypress(struct editor* e) {
 				e->line = 0;
 				editor_cursor_at_offset(e, 0, &e->cursor_x, &e->cursor_y);
 			}
+			break;
 		}
 
 		// Command parsed, do not continue.
@@ -801,10 +825,6 @@ void debug_keypress() {
 }
 
 int main(int argc, char* argv[]) {
-	if (argc == 1) {
-		debug_keypress();
-		exit(0);
-	}
 	if (argc != 2) {
 		fprintf(stderr, "expected arg\n");
 		exit(2);
