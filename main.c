@@ -383,6 +383,12 @@ void editor_cursor_at_offset(struct editor* e, int offset, int* x, int* y) {
  */
 void editor_delete_char_at_cursor(struct editor* e) {
 	int offset = editor_offset_at_cursor(e);
+	int old_length = e->content_length;
+
+	if (e->content_length <= 0) {
+		editor_statusmessage(e, "Nothing to delete");
+		return;
+	}
 
 	// FIXME: when all chars have been removed from a file, this blows up.
 
@@ -394,10 +400,16 @@ void editor_delete_char_at_cursor(struct editor* e) {
 	memmove(e->contents + offset, e->contents + offset + 1 , e->content_length - offset - 1);
 	e->contents = realloc(e->contents, e->content_length - 1);
 	e->content_length--;
+
+	// if the deleted offset was the maximum offset, move the cursor to
+	// the left.
+	if (offset >= old_length - 1) {
+		editor_move_cursor(e, KEY_LEFT, 1);
+	}
 }
 
 /**
- * Gets the current offset at which the cursor is, currently.
+ * Gets the current offset at which the cursor is.
  */
 inline int editor_offset_at_cursor(struct editor* e) {
 	// Calculate the offset based on the cursors' x and y coord (which is bound
@@ -456,7 +468,7 @@ int editor_statusmessage(struct editor* e, const char* fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
 	// TODO valgrind complains here
-	int x = vsnprintf(e->statusmessage, sizeof(e->statusmessage), fmt, ap);
+	int x = vsnprintf(e->statusmessage, 80, fmt, ap);
 	va_end(ap);
 	return x;
 }
@@ -535,6 +547,13 @@ int read_key() {
  * correctly!
  */
 void render_contents(struct editor* e, struct buffer* b) {
+	if (e->content_length <= 0) {
+		// TODO: handle this in a better way.
+		buffer_append(b, "\x1b[2J", 4);
+		buffer_append(b, "empty", 5);
+		return;
+	}
+
 	char address[80];  // example: 000000040
 	char hex[ 2 + 1];  // example: 65
 	char asc[256 + 1]; // example: Hello.World!
@@ -784,8 +803,8 @@ void editor_process_keypress(struct editor* e) {
 struct editor* editor_init() {
 	struct editor* e = malloc(sizeof(struct editor));
 
-	e->octets_per_line = 16;
-	e->grouping = 2;
+	e->octets_per_line = 32;
+	e->grouping = 4;
 	e->hex_line_width = e->octets_per_line * 2 + (e->octets_per_line / 2) - 1;
 
 	e->line = 0;
