@@ -21,6 +21,16 @@ enum editor_mode {
 };
 
 /**
+ * This buffer contains the character sequences to render the current
+ * 'screen'. The buffer is changed as a whole, then written to the screen
+ * in one go to prevent 'flickering' in the terminal.
+ */
+struct buffer {
+	char* contents;
+	int len;
+};
+
+/**
  * This struct contains internal information of the state of the editor.
  */
 struct editor {
@@ -56,15 +66,16 @@ struct editor* editor_init();
 
 void editor_cursor_at_offset(struct editor* e, int offset, int* x, int *y);
 void editor_delete_char_at_cursor(struct editor* e);
-void editor_free(struct editor* ec);
+void editor_free(struct editor* e);
 void editor_move_cursor(struct editor* e, int dir, int amount);
 int  editor_offset_at_cursor(struct editor* e);
 void editor_openfile(struct editor* e, const char* filename);
-void editor_process_keypress(struct editor* ec);
-void editor_refresh_screen(struct editor* ec);
+void editor_process_keypress(struct editor* e);
+void editor_render_contents(struct editor* e, struct buffer* b);
+void editor_refresh_screen(struct editor* e);
 void editor_scroll(struct editor* e, int units);
 void editor_setmode(struct editor *e, enum editor_mode mode);
-int  editor_statusmessage(struct editor* ec, const char* fmt, ...);
+int  editor_statusmessage(struct editor* e, const char* fmt, ...);
 void editor_writefile(struct editor* e);
 
 // Global editor config.
@@ -92,6 +103,88 @@ enum key_codes {
 	KEY_PAGEUP,         // ??
 	KEY_PAGEDOWN,       // ??
 };
+
+/* ==============================================================================
+ * Utility functions.
+ * ============================================================================*/
+
+/**
+ * Reads keypresses from stdin, and processes them accordingly. Escape sequences
+ * will be read properly as well (e.g. DEL will be the bytes 0x1b, 0x5b, 0x33, 0x7e).
+ * The returned integer will contain either one of the enum values, or the key pressed.
+ *
+ * read_key() will only return the correct key code.
+ */
+int read_key() {
+	char c;
+	ssize_t nread;
+	// check == 0 to see if EOF.
+	while ((nread = read(STDIN_FILENO, &c, 1)) == 0);
+	if (nread == -1) {
+		perror("Unable to read from stdin");
+		exit(2);
+	}
+
+	char seq[4]; // escape sequence buffer.
+
+	switch (c) {
+	case KEY_ESC:
+		// Escape key was pressed, OR things like delete, arrow keys, ...
+		// So we will try to read ahead a few bytes, and see if there's more.
+		// For instance, a single Escape key only produces a single 0x1b char.
+		// A delete key produces 0x1b 0x5b 0x33 0x7e.
+		if (read(STDIN_FILENO, seq, 1) == 0) {
+			return KEY_ESC;
+		}
+		if (read(STDIN_FILENO, seq + 1, 1) == 0) {
+			return KEY_ESC;
+		}
+
+		// home = 0x1b, [ = 0x5b, 1 = 0x31, ~ = 0x7e,
+		// end  = 0x1b, [ = 0x5b, 4 = 0x34, ~ = 0x7e,
+		// pageup   1b, [=5b, 5=35, ~=7e,
+		// pagedown 1b, [=5b, 6=36, ~=7e,
+
+		if (seq[0] == '[') {
+			if (seq[1] >= '0' && seq[1] <= '9') {
+				if (read(STDIN_FILENO, seq + 2, 1) == 0) {
+					return KEY_ESC;
+				}
+				if (seq[2] == '~') {
+					switch (seq[1]) {
+					case '1': return KEY_HOME;
+					case '4': return KEY_END;
+					case '5': return KEY_PAGEUP;
+					case '6': return KEY_PAGEDOWN;
+					}
+				}
+			}
+			switch (seq[1]) {
+			case 'A': return KEY_UP;
+			case 'B': return KEY_DOWN;
+			case 'C': return KEY_RIGHT;
+			case 'D': return KEY_LEFT;
+			case 'H': return KEY_HOME; // does not work with me?
+			case 'F': return KEY_END;  // ... same?
+			}
+		}
+		break;
+	}
+
+	return c;
+}
+
+bool get_window_size(int* rows, int* cols) {
+	struct winsize ws;
+	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != 0) {
+		perror("Failed to query terminal size");
+		exit(1);
+	}
+
+	*rows = ws.ws_row;
+	*cols = ws.ws_col;
+	return true;
+}
 
 void enable_raw_mode() {
 	// only enable raw mode when stdin is a tty.
@@ -141,6 +234,68 @@ void clear_screen() {
 		perror("Unable to clear screen");
 	}
 }
+
+/* ==============================================================================
+ * Functions operating on the buffer struct.
+ * ============================================================================*/
+
+/**
+ * Create a buffer on the heap and return it.
+ */
+struct buffer* buffer_create() {
+	struct buffer* b = malloc(sizeof(struct buffer));
+	if (b) {
+		b->contents = NULL;
+		b->len = 0;
+		return b;
+	} else {
+		perror("Unable to allocate size for struct buffer");
+		exit(1);
+	}
+}
+
+/**
+ * Deletes the buffer's contents, and the buffer itself.
+ */
+void buffer_free(struct buffer* buf) {
+	free(buf->contents);
+	free(buf);
+}
+
+/**
+ * Appends `what' to the buffer, writing at most `len' bytes. Note that
+ * if we use snprintf() to format a particular string, we have to subtract
+ * 1 from the `len', to discard the null terminator character.
+ */
+void buffer_append(struct buffer* buf, const char* what, size_t len) {
+	assert(what != NULL);
+
+	// reallocate the contents with more memory, to hold 'what'.
+	char* new = realloc(buf->contents, buf->len + len);
+	if (new == NULL) {
+		perror("Unable to realloc buffer");
+		exit(1);
+	}
+
+	// copy 'what' to the target memory
+	memcpy(new + buf->len, what, len);
+	buf->contents = new;
+	buf->len += len;
+}
+
+/**
+ * Draws (writes) the buffer to the screen.
+ */
+void buffer_draw(struct buffer* buf) {
+	if (write(STDOUT_FILENO, buf->contents, buf->len) == -1) {
+		perror("Can't write buffer");
+		exit(1);
+	}
+}
+
+/* ==============================================================================
+ * Functions operating on the editor.
+ * ============================================================================*/
 
 /**
  * Moves the cursor. The terminal cursor positions are all 1-based, so we
@@ -220,83 +375,6 @@ void editor_move_cursor(struct editor* e, int dir, int amount) {
 		return;
 	}
 }
-
-bool get_window_size(int* rows, int* cols) {
-	struct winsize ws;
-	if (ioctl(STDOUT_FILENO, TIOCGWINSZ, &ws) != 0) {
-		perror("Failed to query terminal size");
-		exit(1);
-	}
-
-	*rows = ws.ws_row;
-	*cols = ws.ws_col;
-	return true;
-}
-
-/**
- * This buffer contains the character sequences to render the current
- * 'screen'. The buffer is changed as a whole, then written to the screen
- * in one go to prevent 'flickering' in the terminal.
- */
-struct buffer {
-	char* contents;
-	int len;
-};
-
-/**
- * Create a buffer on the heap and return it.
- */
-struct buffer* buffer_create() {
-	struct buffer* b = malloc(sizeof(struct buffer));
-	if (b) {
-		b->contents = NULL;
-		b->len = 0;
-		return b;
-	} else {
-		perror("Unable to allocate size for struct buffer");
-		exit(1);
-	}
-}
-
-/**
- * Deletes the buffer's contents, and the buffer itself.
- */
-void buffer_free(struct buffer* buf) {
-	free(buf->contents);
-	free(buf);
-}
-
-/**
- * Appends `what' to the buffer, writing at most `len' bytes. Note that
- * if we use snprintf() to format a particular string, we have to subtract
- * 1 from the `len', to discard the null terminator character.
- */
-void buffer_append(struct buffer* buf, const char* what, size_t len) {
-	assert(what != NULL);
-
-	// reallocate the contents with more memory, to hold 'what'.
-	char* new = realloc(buf->contents, buf->len + len);
-	if (new == NULL) {
-		perror("Unable to realloc buffer");
-		exit(1);
-	}
-
-	// copy 'what' to the target memory
-	memcpy(new + buf->len, what, len);
-	buf->contents = new;
-	buf->len += len;
-}
-
-/**
- * Draws (writes) the buffer to the screen.
- */
-void buffer_draw(struct buffer* buf) {
-	if (write(STDOUT_FILENO, buf->contents, buf->len) == -1) {
-		perror("Can't write buffer");
-		exit(1);
-	}
-}
-
 /**
  * Opens a file denoted by `filename', or exit if the file cannot be opened.
  * The editor struct is used to contain the contents and other metadata
@@ -473,80 +551,12 @@ int editor_statusmessage(struct editor* e, const char* fmt, ...) {
 	return x;
 }
 
-/**
- * Reads keypresses from stdin, and processes them accordingly. Escape sequences
- * will be read properly as well (e.g. DEL will be the bytes 0x1b, 0x5b, 0x33, 0x7e).
- * The returned integer will contain either one of the enum values, or the key pressed.
- *
- * read_key() will only return the correct key code.
- */
-int read_key() {
-	char c;
-	ssize_t nread;
-	// check == 0 to see if EOF.
-	while ((nread = read(STDIN_FILENO, &c, 1)) == 0);
-	if (nread == -1) {
-		perror("Unable to read from stdin");
-		exit(2);
-	}
-
-	char seq[4]; // escape sequence buffer.
-
-	switch (c) {
-	case KEY_ESC:
-		// Escape key was pressed, OR things like delete, arrow keys, ...
-		// So we will try to read ahead a few bytes, and see if there's more.
-		// For instance, a single Escape key only produces a single 0x1b char.
-		// A delete key produces 0x1b 0x5b 0x33 0x7e.
-		if (read(STDIN_FILENO, seq, 1) == 0) {
-			return KEY_ESC;
-		}
-		if (read(STDIN_FILENO, seq + 1, 1) == 0) {
-			return KEY_ESC;
-		}
-
-		// home = 0x1b, [ = 0x5b, 1 = 0x31, ~ = 0x7e,
-		// end  = 0x1b, [ = 0x5b, 4 = 0x34, ~ = 0x7e,
-		// pageup   1b, [=5b, 5=35, ~=7e,
-		// pagedown 1b, [=5b, 6=36, ~=7e,
-
-		if (seq[0] == '[') {
-			if (seq[1] >= '0' && seq[1] <= '9') {
-				if (read(STDIN_FILENO, seq + 2, 1) == 0) {
-					return KEY_ESC;
-				}
-				if (seq[2] == '~') {
-					switch (seq[1]) {
-					case '1': return KEY_HOME;
-					case '4': return KEY_END;
-					case '5': return KEY_PAGEUP;
-					case '6': return KEY_PAGEDOWN;
-					}
-				}
-			}
-			switch (seq[1]) {
-			case 'A': return KEY_UP;
-			case 'B': return KEY_DOWN;
-			case 'C': return KEY_RIGHT;
-			case 'D': return KEY_LEFT;
-			case 'H': return KEY_HOME; // does not work with me?
-			case 'F': return KEY_END;  // ... same?
-			}
-		}
-		break;
-	}
-
-	return c;
-}
 
 /**
  * Renders the contents of the current state of the editor `e'
  * to the buffer `b'.
- *
- * TODO: parameterize things like grouping of bytes and whatnot,
- * correctly!
  */
-void render_contents(struct editor* e, struct buffer* b) {
+void editor_render_contents(struct editor* e, struct buffer* b) {
 	if (e->content_length <= 0) {
 		// TODO: handle this in a better way.
 		buffer_append(b, "\x1b[2J", 4);
@@ -554,6 +564,7 @@ void render_contents(struct editor* e, struct buffer* b) {
 		return;
 	}
 
+	// FIXME: proper sizing of these arrays (malloc?)
 	char address[80];  // example: 000000040
 	char hex[ 2 + 1];  // example: 65
 	char asc[256 + 1]; // example: Hello.World!
@@ -685,7 +696,7 @@ void editor_refresh_screen(struct editor* e) {
 
 	buffer_append(b, "\x1b[H", 3); // move the cursor top left
 
-	render_contents(e, b);
+	editor_render_contents(e, b);
 
 	// Move down to write the status message.
 	bw = snprintf(buf, sizeof(buf), "\x1b[%d;0H", e->screen_rows);
