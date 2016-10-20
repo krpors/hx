@@ -18,6 +18,7 @@ enum editor_mode {
 	MODE_NORMAL,  // normal mode i.e. for navigating, commands.
 	MODE_INSERT,  // insert values at cursor position.
 	MODE_REPLACE, // replace values at cursor position.
+	MODE_COMMAND, // command input mode.
 };
 
 /**
@@ -60,6 +61,28 @@ void enable_raw_mode();
 void disable_raw_mode();
 void clear_screen();
 int read_key();
+bool ishex(const char c) {
+	return
+		(c >= '0' && c <= '9') ||
+		(c >= 'A' && c <= 'F') ||
+		(c >= 'a' && c <= 'f');
+}
+int hex2bin(const char* s) {
+	int ret=0;
+	for(int i = 0; i < 2; i++) {
+		char c = *s++;
+		int n=0;
+		if( '0' <= c && c <= '9')  {
+			n = c-'0';
+		} else if ('a' <= c && c <= 'f') {
+			n = 10 + c - 'a';
+		} else if ('A' <= c && c <= 'F') {
+			n = 10 + c - 'A';
+		}
+		ret = n + ret*16;
+	}
+	return ret;
+}
 
 // editor functions:
 struct editor* editor_init();
@@ -74,6 +97,7 @@ void editor_openfile(struct editor* e, const char* filename);
 void editor_process_keypress(struct editor* e);
 void editor_render_contents(struct editor* e, struct buffer* b);
 void editor_refresh_screen(struct editor* e);
+void editor_replace_byte(struct editor* e, char x);
 void editor_scroll(struct editor* e, int units);
 void editor_setmode(struct editor *e, enum editor_mode mode);
 int  editor_statusmessage(struct editor* e, const char* fmt, ...);
@@ -550,6 +574,7 @@ void editor_setmode(struct editor* e, enum editor_mode mode) {
 	case MODE_NORMAL:  editor_statusmessage(e, ""); break;
 	case MODE_INSERT:  editor_statusmessage(e, "-- INSERT --"); break;
 	case MODE_REPLACE: editor_statusmessage(e, "-- REPLACE --"); break;
+	case MODE_COMMAND: return; // nothing.
 	}
 }
 
@@ -666,6 +691,7 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 	// clear everything up until the end
 	buffer_append(b, "\x1b[0J", 4);
 
+#ifndef NDEBUG
 	int len = 256;
 	char debug[len];
 	memset(debug, 0, len);
@@ -691,8 +717,7 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 	editor_cursor_at_offset(e, curr_offset, &xx, &yy);
 	snprintf(debug, len, "\e[5;80H\e[0Kyy,xx = %d, %d", yy, xx);
 	buffer_append(b, debug, len);
-
-
+#endif
 }
 
 /**
@@ -812,11 +837,30 @@ void editor_process_keypress(struct editor* e) {
 		return;
 	}
 
-	// Actual edit mode.
 	if (e->mode == MODE_INSERT) {
-		editor_insert(e, (char) c);
+		// Insert character after the cursor.
+		//editor_insert(e, (char) c);
 	} else if (e->mode == MODE_REPLACE) {
-		editor_replace_byte(e, (char) c);
+		// Check if the input character was a valid hex value. If not, return prematurely.
+		if (!ishex(c)) {
+			editor_statusmessage(e, "'%c' is not valid hex", c);
+			return;
+		}
+		int next = read_key();
+		if (!ishex(next)) {
+			editor_statusmessage(e, "'%c' is not valid hex", c);
+			return;
+		}
+
+		int offset = editor_offset_at_cursor(e);
+		char crud[2 + 1];
+		snprintf(crud, sizeof(crud), "%c%c", (char)c, (char)next);
+		char ashex = hex2bin(crud);
+		fprintf(stderr, "%s = %c\n", crud, ashex);
+		editor_replace_byte(e, ashex);
+		editor_statusmessage(e, "Replaced byte at offset %09x with %02x", offset, (unsigned char)ashex);
+	} else if (e->mode == MODE_COMMAND) {
+		// Input manual, typed commands.
 	}
 }
 /**
