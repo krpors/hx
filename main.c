@@ -66,6 +66,7 @@ struct editor* editor_init();
 
 void editor_cursor_at_offset(struct editor* e, int offset, int* x, int *y);
 void editor_delete_char_at_cursor(struct editor* e);
+void editor_exit();
 void editor_free(struct editor* e);
 void editor_move_cursor(struct editor* e, int dir, int amount);
 int  editor_offset_at_cursor(struct editor* e);
@@ -194,7 +195,7 @@ void enable_raw_mode() {
 	}
 
 	// Disable raw mode when we exit hx normally.
-	atexit(disable_raw_mode);
+	atexit(editor_exit);
 
 	tcgetattr(STDIN_FILENO, &orig_termios);
 
@@ -223,14 +224,15 @@ void enable_raw_mode() {
 }
 
 void disable_raw_mode() {
-	editor_free(g_ec);
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
-	clear_screen();
 }
 
 
 void clear_screen() {
-	if (write(STDOUT_FILENO, "\x1b[2J\n", 5) == -1) {
+	// clear the colors, move the cursor up-left, clear the screen.
+	char stuff[80];
+	int bw = snprintf(stuff, 80, "\x1b[0m\x1b[H\x1b[2J");
+	if (write(STDOUT_FILENO, stuff, bw) == -1) {
 		perror("Unable to clear screen");
 	}
 }
@@ -484,6 +486,15 @@ void editor_delete_char_at_cursor(struct editor* e) {
 	if (offset >= old_length - 1) {
 		editor_move_cursor(e, KEY_LEFT, 1);
 	}
+}
+
+/**
+ * Exits the editor, frees some stuff and resets the terminal setting.
+ */
+void editor_exit() {
+	editor_free(g_ec);
+	clear_screen();
+	disable_raw_mode();
 }
 
 /**
@@ -814,8 +825,8 @@ void editor_process_keypress(struct editor* e) {
 struct editor* editor_init() {
 	struct editor* e = malloc(sizeof(struct editor));
 
-	e->octets_per_line = 32;
-	e->grouping = 4;
+	e->octets_per_line = 16;
+	e->grouping = 2;
 	e->hex_line_width = e->octets_per_line * 2 + (e->octets_per_line / 2) - 1;
 
 	e->line = 0;
