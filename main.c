@@ -439,8 +439,9 @@ void editor_openfile(struct editor* e, const char* filename) {
 		exit(1);
 	}
 
-	e->filename = malloc(strlen(filename));
-	strncpy(e->filename, filename, strlen(filename));
+	// duplicate string without using gnu99 strdup().
+	e->filename = malloc(strlen(filename) + 1);
+	strncpy(e->filename, filename, strlen(filename) + 1);
 	e->contents = contents;
 	e->content_length = size;
 	editor_statusmessage(e, "\"%s\" (%d bytes)", e->filename, e->content_length);
@@ -890,6 +891,8 @@ struct editor* editor_init() {
 	e->filename = NULL;
 	e->contents = NULL;
 	e->content_length = 0;
+
+	memset(e->statusmessage, 0, sizeof(e->statusmessage));
 
 	e->mode = MODE_NORMAL;
 
