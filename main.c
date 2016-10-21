@@ -91,6 +91,7 @@ void editor_cursor_at_offset(struct editor* e, int offset, int* x, int *y);
 void editor_delete_char_at_cursor(struct editor* e);
 void editor_exit();
 void editor_free(struct editor* e);
+void editor_increment_byte(struct editor* e, int amount);
 void editor_move_cursor(struct editor* e, int dir, int amount);
 int  editor_offset_at_cursor(struct editor* e);
 void editor_openfile(struct editor* e, const char* filename);
@@ -521,6 +522,11 @@ void editor_exit() {
 	disable_raw_mode();
 }
 
+void editor_increment_byte(struct editor* e, int amount) {
+	int offset = editor_offset_at_cursor(e);
+	e->contents[offset] += amount;
+}
+
 /**
  * Gets the current offset at which the cursor is.
  */
@@ -831,6 +837,11 @@ void editor_process_keypress(struct editor* e) {
 				editor_cursor_at_offset(e, 0, &e->cursor_x, &e->cursor_y);
 			}
 			break;
+		case ']':
+			editor_increment_byte(e, 1);
+			break;
+		case '[':
+			editor_increment_byte(e, -1);
 		}
 
 		// Command parsed, do not continue.
@@ -848,7 +859,7 @@ void editor_process_keypress(struct editor* e) {
 		}
 		int next = read_key();
 		if (!ishex(next)) {
-			editor_statusmessage(e, "'%c' is not valid hex", c);
+			editor_statusmessage(e, "'%c' is not valid hex", next);
 			return;
 		}
 
