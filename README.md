@@ -1,7 +1,6 @@
 # hx
 Attempt to create a hex editor using plain C + POSIX libs. The project's code
-is somewhat influenced by the [kilo project](https://github.com/antirez/kilo)
-project.
+is somewhat influenced by the [kilo project](https://github.com/antirez/kilo).
 
 # Compiling and running
 The project does not have a dependency on libraries, not even curses. Like the
@@ -42,8 +41,8 @@ and then one function renders the contents, cursor and stuff.
 Not everything is final and some refactoring is needed. Valgrind doesn't
 report any leaks so that looks OK :)
 
-# Wishlist
-Some extras I still like to see:
+# Wishlist and TODOs
 
 1. Searching a string or byte sequence.
 1. Going to offset of choice.
+1. Act on resizing of the terminal?

@@ -1,16 +1,22 @@
+/*
+ * hx - a hex editor for the terminal.
+ *
+ * Copyright (c) 2016 Kevin Pors. See LICENSE for details.
+ */
+
 #include <assert.h>
-#include <stdio.h>
-#include <stdlib.h>
+#include <ctype.h>
+#include <errno.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
-#include <ctype.h>
 
-#include <unistd.h>
-#include <termios.h>
 #include <sys/ioctl.h>
+#include <termios.h>
+#include <unistd.h>
 
 // Declarations.
 
@@ -60,29 +66,9 @@ struct editor {
 void enable_raw_mode();
 void disable_raw_mode();
 void clear_screen();
-int read_key();
-bool ishex(const char c) {
-	return
-		(c >= '0' && c <= '9') ||
-		(c >= 'A' && c <= 'F') ||
-		(c >= 'a' && c <= 'f');
-}
-int hex2bin(const char* s) {
-	int ret=0;
-	for(int i = 0; i < 2; i++) {
-		char c = *s++;
-		int n=0;
-		if( '0' <= c && c <= '9')  {
-			n = c-'0';
-		} else if ('a' <= c && c <= 'f') {
-			n = 10 + c - 'a';
-		} else if ('A' <= c && c <= 'F') {
-			n = 10 + c - 'A';
-		}
-		ret = n + ret*16;
-	}
-	return ret;
-}
+int  read_key();
+bool ishex(const char c);
+int  hex2bin(const char* s);
 
 // editor functions:
 struct editor* editor_init();
@@ -97,6 +83,7 @@ int  editor_offset_at_cursor(struct editor* e);
 void editor_openfile(struct editor* e, const char* filename);
 void editor_process_keypress(struct editor* e);
 void editor_render_contents(struct editor* e, struct buffer* b);
+void editor_render_ruler(struct editor* e, struct buffer* buf);
 void editor_refresh_screen(struct editor* e);
 void editor_replace_byte(struct editor* e, char x);
 void editor_scroll(struct editor* e, int units);
@@ -133,6 +120,30 @@ enum key_codes {
 /* ==============================================================================
  * Utility functions.
  * ============================================================================*/
+
+bool ishex(const char c) {
+	return
+		(c >= '0' && c <= '9') ||
+		(c >= 'A' && c <= 'F') ||
+		(c >= 'a' && c <= 'f');
+}
+
+int hex2bin(const char* s) {
+	int ret=0;
+	for(int i = 0; i < 2; i++) {
+		char c = *s++;
+		int n=0;
+		if( '0' <= c && c <= '9')  {
+			n = c-'0';
+		} else if ('a' <= c && c <= 'f') {
+			n = 10 + c - 'a';
+		} else if ('A' <= c && c <= 'F') {
+			n = 10 + c - 'A';
+		}
+		ret = n + ret*16;
+	}
+	return ret;
+}
 
 /**
  * Reads keypresses from stdin, and processes them accordingly. Escape sequences
@@ -588,7 +599,6 @@ void editor_setmode(struct editor* e, enum editor_mode mode) {
 int editor_statusmessage(struct editor* e, const char* fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
-	// TODO valgrind complains here
 	int x = vsnprintf(e->statusmessage, 80, fmt, ap);
 	va_end(ap);
 	return x;
@@ -727,6 +737,33 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 #endif
 }
 
+/*
+ * Renders a ruler at the bottom right part of the screen, containing
+ * the current offset in hex and in base 10, the byte at the current
+ * cursor position, and how far the cursor is in the file (as a percentage).
+ */
+void editor_render_ruler(struct editor* e, struct buffer* b) {
+	char rulermsg[80]; // buffer for the actual message.
+	char buf[20];      // buffer for the cursor positioning
+
+	int offset_at_cursor = editor_offset_at_cursor(e);
+	unsigned char val = e->contents[offset_at_cursor];
+	int percentage = (float)(offset_at_cursor + 1) / (float)e->content_length * 100;
+
+	// Create a ruler string. We need to calculate the amount of bytes
+	// we've actually written, to subtract that from the screen_cols to
+	// align the string properly.
+	int rmbw = snprintf(rulermsg, sizeof(rulermsg),
+			"[0x%09x,%d]:%02x  %d%%",
+			offset_at_cursor, offset_at_cursor, val, percentage);
+	// Create a string for the buffer to position the cursor.
+	int cpbw = snprintf(buf, sizeof(buf), "\x1b[0m\x1b[%d;%dH", e->screen_rows, e->screen_cols - rmbw);
+
+	// First write the cursor string, followed by the ruler message.
+	buffer_append(b, buf, cpbw);
+	buffer_append(b, rulermsg, rmbw);
+}
+
 /**
  * Refreshes the screen. It uses a temporary buffer to write everything that's
  * eligible for display to an internal buffer, and then 'draws' it to the screen
@@ -747,8 +784,9 @@ void editor_refresh_screen(struct editor* e) {
 	// Change the color
 	buffer_append(b, "\x1b[0;30;47m", 10);
 	buffer_append(b, e->statusmessage, strlen(e->statusmessage));
-	// Clear until the end of the line to the right
-	//buffer_append(b, "\x1b[0K", 4);
+
+	// Ruler: move to the right of the screen etc.
+	editor_render_ruler(e, b);
 
 	// Position cursor. This is done by taking into account the current
 	// cursor position (1 .. 40), and the amount of spaces to add due to
@@ -906,6 +944,7 @@ void editor_free(struct editor* e) {
 	free(e->contents);
 	free(e);
 }
+
 
 void debug_keypress() {
 	char c;
