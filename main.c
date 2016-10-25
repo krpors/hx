@@ -15,6 +15,7 @@
 #include <string.h>
 
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 #include <termios.h>
 #include <unistd.h>
 
@@ -421,7 +422,20 @@ void editor_move_cursor(struct editor* e, int dir, int amount) {
 void editor_openfile(struct editor* e, const char* filename) {
 	FILE* fp = fopen(filename, "rb");
 	if (fp == NULL) {
-		perror("Opening file");
+		perror("Cannot open file");
+		exit(1);
+	}
+
+	// stat() the file.
+	struct stat statbuf;
+	if (stat(filename, &statbuf) == -1) {
+		perror("Cannot stat file");
+		exit(1);
+	}
+	// S_ISREG is a a POSIX macro to check whether the given st_mode denotes a
+	// regular file. See `man 2 stat'.
+	if (!S_ISREG(statbuf.st_mode)) {
+		fprintf(stderr, "File '%s' is not a regular file\n", filename);
 		exit(1);
 	}
 
@@ -445,7 +459,7 @@ void editor_openfile(struct editor* e, const char* filename) {
 	char* contents = malloc(sizeof(char) * size);
 
 	if (fread(contents, size, 1, fp) <= 0) {
-		perror("Unable to read bytes");
+		perror("Unable to read file contents");
 		free(contents);
 		exit(1);
 	}
@@ -774,6 +788,7 @@ void editor_refresh_screen(struct editor* e) {
 	int bw; // bytes written by snprintf.
 	struct buffer* b = buffer_create();
 
+	buffer_append(b, "\x1b[?25l", 6);
 	buffer_append(b, "\x1b[H", 3); // move the cursor top left
 
 	editor_render_contents(e, b);
@@ -797,6 +812,7 @@ void editor_refresh_screen(struct editor* e) {
 	int cruft = curx + spaces + 12; // 12 = the size of the address + ": "
 	bw = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", e->cursor_y, cruft);
 	buffer_append(b, buf, bw);
+	buffer_append(b, "\x1b[?25h", 6);
 
 	buffer_draw(b);
 	buffer_free(b);

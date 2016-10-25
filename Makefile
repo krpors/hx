@@ -1,5 +1,5 @@
 CC=gcc
-CFLAGS=-std=c99 -Wall -O3 -ggdb
+CFLAGS=-std=c99 -Wall -O3 -ggdb -DNDEBUG
 
 DEPS=
 OBJECTS=main.o
