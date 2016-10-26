@@ -4,9 +4,11 @@
  * Copyright (c) 2016 Kevin Pors. See LICENSE for details.
  */
 
+// C99 includes
 #include <assert.h>
 #include <ctype.h>
 #include <errno.h>
+#include <inttypes.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -14,6 +16,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+// POSIX and Linux cruft
+#include <getopt.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <termios.h>
@@ -70,6 +74,8 @@ void clear_screen();
 int  read_key();
 bool ishex(const char c);
 int  hex2bin(const char* s);
+int str2int(const char* s, int min, int max, int def);
+void print_help(const char* explanation);
 
 // editor functions:
 struct editor* editor_init();
@@ -144,6 +150,45 @@ int hex2bin(const char* s) {
 		ret = n + ret*16;
 	}
 	return ret;
+}
+
+/**
+ * Parses a string to an integer and returns it. In case of errors, the default
+ * `def' will be returned. When the `min' > parsed_value > `max', then the
+ * default `def' will also be returned.
+ *
+ * XXX: probably return some error indicator instead, and exit with a message?
+ */
+int str2int(const char* s, int min, int max, int def) {
+	char* endptr;
+	uintmax_t x = strtoimax(s, &endptr, 10);
+	if (errno  == ERANGE) {
+		return def;
+	}
+	if (x < min || x > max) {
+		return def;
+	}
+	return x;
+}
+
+/**
+ * Prints help to the stderr when invoked with -h or with unknown arguments.
+ * Explanation can be given for some extra information.
+ */
+void print_help(const char* explanation) {
+	fprintf(stderr,
+"%s"\
+"usage: hx [-o octets_per_line] [-g grouping_bytes] -f filename\n"\
+"\n"
+"Command options:\n"
+"    -o     Amount of octets per line.\n"
+"    -g     Grouping of bytes in one line.\n"
+"\n"
+"Currently, both these values are advised to be a multiple of 2\n"
+"to prevent garbled display :)\n"
+"\n"
+"Report bugs to <krpors at gmail.com> or see <http://github.com/krpors/hx>\n"
+, explanation);
 }
 
 /**
@@ -422,7 +467,7 @@ void editor_move_cursor(struct editor* e, int dir, int amount) {
 void editor_openfile(struct editor* e, const char* filename) {
 	FILE* fp = fopen(filename, "rb");
 	if (fp == NULL) {
-		perror("Cannot open file");
+		fprintf(stderr, "Cannot open file '%s': %s\n", filename, strerror(errno));
 		exit(1);
 	}
 
@@ -979,14 +1024,50 @@ void debug_keypress() {
 }
 
 int main(int argc, char* argv[]) {
-	if (argc != 2) {
-		fprintf(stderr, "expected arg\n");
-		exit(2);
+	char* file = NULL;
+	int octets_per_line = 16;
+	int grouping = 4;
+
+	int ch = 0;
+	while ((ch = getopt(argc, argv, "hf:g:o:")) != -1) {
+		switch (ch) {
+		case 'h':
+			print_help("");
+			exit(0);
+			break;
+		case 'g':
+			// parse grouping
+			grouping = str2int(optarg, 2, 16, 4);
+			break;
+		case 'o':
+			// parse octets per line
+			octets_per_line = str2int(optarg, 16, 64, 16);
+			break;
+		case 'f':
+			file = optarg;
+			break;
+		default:
+			print_help("");
+			exit(1);
+			break;
+		}
+	}
+
+	// Getopt doesn't seem to err prematurely when -f isn't specified.
+	// Either way, I'd prefer to invoke the program as ./hx FILENAME
+	// instead of giving the forced '-f' flag, but unsure how to do
+	// that properly yet, so here goes.
+	if (file == NULL) {
+		print_help("error: file must be specified using -f\n");
+		exit(1);
 	}
 
 	// Editor configuration passed around.
 	g_ec = editor_init();
-	editor_openfile(g_ec, argv[1]);
+	g_ec->octets_per_line = octets_per_line;
+	g_ec->grouping = grouping;
+
+	editor_openfile(g_ec, file);
 
 	enable_raw_mode();
 	clear_screen();

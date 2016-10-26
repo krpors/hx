@@ -46,3 +46,5 @@ report any leaks so that looks OK :)
 1. Searching a string or byte sequence.
 1. Going to offset of choice.
 1. Act on resizing of the terminal?
+1. Colorize changes made to a file
+1. Undo/redo actions
