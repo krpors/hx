@@ -1,5 +1,8 @@
+# Read the version of the current commit.
+HX_GIT_HASH := $(shell git rev-parse --verify HEAD --short=12)
+
 CC=gcc
-CFLAGS=-std=c99 -Wall -O3 -ggdb -DNDEBUG
+CFLAGS=-std=c99 -Wall -O3 -ggdb -DNDEBUG -DHX_GIT_HASH=\"$(HX_GIT_HASH)\"
 
 DEPS=
 OBJECTS=main.o

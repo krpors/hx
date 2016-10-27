@@ -23,8 +23,18 @@
 #include <termios.h>
 #include <unistd.h>
 
-// Declarations.
+// hx defines. Not declared as const because we may want to adjust
+// this by using a tool or whatever.
 
+#ifndef HX_GIT_HASH
+#define HX_GIT_HASH "unknown"
+#endif
+
+#ifndef HX_VERSION
+#define HX_VERSION "1.0.0"
+#endif
+
+// Declarations.
 enum editor_mode {
 	MODE_NORMAL,  // normal mode i.e. for navigating, commands.
 	MODE_INSERT,  // insert values at cursor position.
@@ -75,6 +85,7 @@ int  read_key();
 bool ishex(const char c);
 int  hex2bin(const char* s);
 int str2int(const char* s, int min, int max, int def);
+void print_version();
 void print_help(const char* explanation);
 
 // editor functions:
@@ -189,6 +200,13 @@ void print_help(const char* explanation) {
 "\n"
 "Report bugs to <krpors at gmail.com> or see <http://github.com/krpors/hx>\n"
 , explanation);
+}
+
+/**
+ * Prints some version information back to the stdout.
+ */
+void print_version() {
+	printf("hx version %s (git: %s)\n", HX_VERSION, HX_GIT_HASH);
 }
 
 /**
@@ -810,6 +828,12 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
  * cursor position, and how far the cursor is in the file (as a percentage).
  */
 void editor_render_ruler(struct editor* e, struct buffer* b) {
+	// Nothing to see. No address, no byte, no percentage. It's all a plain
+	// dark void right now. Oblivion. No data to see here, move along.
+	if (e->content_length <= 0) {
+		return;
+	}
+
 	char rulermsg[80]; // buffer for the actual message.
 	char buf[20];      // buffer for the cursor positioning
 
@@ -821,7 +845,7 @@ void editor_render_ruler(struct editor* e, struct buffer* b) {
 	// we've actually written, to subtract that from the screen_cols to
 	// align the string properly.
 	int rmbw = snprintf(rulermsg, sizeof(rulermsg),
-			"[0x%09x,%d]:%02x  %d%%",
+			"0x%09x,%d (%02x)  %d%%",
 			offset_at_cursor, offset_at_cursor, val, percentage);
 	// Create a string for the buffer to position the cursor.
 	int cpbw = snprintf(buf, sizeof(buf), "\x1b[0m\x1b[%d;%dH", e->screen_rows, e->screen_cols - rmbw);
@@ -852,6 +876,7 @@ void editor_refresh_screen(struct editor* e) {
 	// Change the color
 	buffer_append(b, "\x1b[0;30;47m", 10);
 	buffer_append(b, e->statusmessage, strlen(e->statusmessage));
+	buffer_append(b, "\x1b[0m", 4);
 
 	// Ruler: move to the right of the screen etc.
 	editor_render_ruler(e, b);
@@ -1037,8 +1062,11 @@ int main(int argc, char* argv[]) {
 	int grouping = 4;
 
 	int ch = 0;
-	while ((ch = getopt(argc, argv, "hg:o:")) != -1) {
+	while ((ch = getopt(argc, argv, "vhg:o:")) != -1) {
 		switch (ch) {
+		case 'v':
+			print_version();
+			return 0;
 		case 'h':
 			print_help("");
 			exit(0);
