@@ -178,7 +178,7 @@ int str2int(const char* s, int min, int max, int def) {
 void print_help(const char* explanation) {
 	fprintf(stderr,
 "%s"\
-"usage: hx [-o octets_per_line] [-g grouping_bytes] -f filename\n"\
+"usage: hx [-o octets_per_line] [-g grouping_bytes] filename\n"\
 "\n"
 "Command options:\n"
 "    -o     Amount of octets per line.\n"
@@ -464,6 +464,7 @@ void editor_move_cursor(struct editor* e, int dir, int amount) {
  * The editor struct is used to contain the contents and other metadata
  * about the file being opened.
  */
+
 void editor_openfile(struct editor* e, const char* filename) {
 	FILE* fp = fopen(filename, "rb");
 	if (fp == NULL) {
@@ -514,7 +515,13 @@ void editor_openfile(struct editor* e, const char* filename) {
 	strncpy(e->filename, filename, strlen(filename) + 1);
 	e->contents = contents;
 	e->content_length = size;
-	editor_statusmessage(e, "\"%s\" (%d bytes)", e->filename, e->content_length);
+
+	// Check if the file is readonly, and warn the user about that.
+	if (access(filename, W_OK) == -1) {
+		editor_statusmessage(e, "\"%s\" (%d bytes) [readonly]", e->filename, e->content_length);
+	} else {
+		editor_statusmessage(e, "\"%s\" (%d bytes)", e->filename, e->content_length);
+	}
 
 	fclose(fp);
 }
@@ -527,13 +534,14 @@ void editor_writefile(struct editor* e) {
 
 	FILE* fp = fopen(e->filename, "w");
 	if (fp == NULL) {
-		editor_statusmessage(e, "Unable to open '%s' for writing", e->filename);
+		editor_statusmessage(e, "Unable to open '%s' for writing: %s", e->filename, strerror(errno));
 		return;
 	}
 
 	size_t bw = fwrite(e->contents, sizeof(char), e->content_length, fp);
 	if (bw <= 0) {
-		editor_statusmessage(e, "Couldn't write to file!!");
+		editor_statusmessage(e, "Unable write to file: %s", strerror(errno));
+		return;
 	}
 
 	editor_statusmessage(e, "\"%s\", %d bytes written", e->filename, e->content_length);
@@ -1029,7 +1037,7 @@ int main(int argc, char* argv[]) {
 	int grouping = 4;
 
 	int ch = 0;
-	while ((ch = getopt(argc, argv, "hf:g:o:")) != -1) {
+	while ((ch = getopt(argc, argv, "hg:o:")) != -1) {
 		switch (ch) {
 		case 'h':
 			print_help("");
@@ -1043,9 +1051,6 @@ int main(int argc, char* argv[]) {
 			// parse octets per line
 			octets_per_line = str2int(optarg, 16, 64, 16);
 			break;
-		case 'f':
-			file = optarg;
-			break;
 		default:
 			print_help("");
 			exit(1);
@@ -1053,14 +1058,14 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-	// Getopt doesn't seem to err prematurely when -f isn't specified.
-	// Either way, I'd prefer to invoke the program as ./hx FILENAME
-	// instead of giving the forced '-f' flag, but unsure how to do
-	// that properly yet, so here goes.
-	if (file == NULL) {
-		print_help("error: file must be specified using -f\n");
+
+	// After all options are parsed, we expect a filename to open.
+	if (optind >= argc) {
+		print_help("error: expected filename\n");
 		exit(1);
 	}
+
+	file = argv[optind];
 
 	// Editor configuration passed around.
 	g_ec = editor_init();
