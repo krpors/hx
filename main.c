@@ -795,9 +795,28 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 		// If we reached the end of a 'row', start writing the ASCII equivalents
 		// of the 'row', in a different color. Then hit CRLF to go to the next line.
 		if ((offset+1) % e->octets_per_line == 0) {
-			buffer_append(b, "\e[1;32m", 8);
 			buffer_append(b, "  ", 2);
-			buffer_append(b, asc, strlen(asc));
+
+			// Alternate colors here.
+			// TODO: Currently this is very naive.
+			bool swap = false;
+			for (int i = 0; i < strlen(asc); i++) {
+				if (i % e->grouping == 0) {
+					//buffer_append(b, " ", 1);
+					swap = !swap;
+				}
+
+				// TODO: the color sequences are written EVERY LOOP!!
+				if (swap) {
+					buffer_append(b, "\x1b[0;36m", 7);
+				} else {
+					buffer_append(b, "\x1b[0;37m", 7);
+				}
+
+				char buf[2];
+				snprintf(buf, 2, "%c",  asc[i]);
+				buffer_append(b, buf, 1);
+			}
 			buffer_append(b, "\r\n", 2);
 		}
 	}
