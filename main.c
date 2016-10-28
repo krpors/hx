@@ -4,6 +4,9 @@
  * Copyright (c) 2016 Kevin Pors. See LICENSE for details.
  */
 
+// Define _POSIX_SOURCE to enable sigaction(). See `man 2 sigaction'
+#define _POSIX_SOURCE
+
 // C99 includes
 #include <assert.h>
 #include <ctype.h>
@@ -18,6 +21,7 @@
 
 // POSIX and Linux cruft
 #include <getopt.h>
+#include <signal.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 #include <termios.h>
@@ -189,11 +193,13 @@ int str2int(const char* s, int min, int max, int def) {
 void print_help(const char* explanation) {
 	fprintf(stderr,
 "%s"\
-"usage: hx [-o octets_per_line] [-g grouping_bytes] filename\n"\
+"usage: hx [-hv] [-o octets_per_line] [-g grouping_bytes] filename\n"\
 "\n"
 "Command options:\n"
-"    -o     Amount of octets per line.\n"
-"    -g     Grouping of bytes in one line.\n"
+"    -h     Print this cruft and exits\n"
+"    -v     Version information\n"
+"    -o     Amount of octets per line\n"
+"    -g     Grouping of bytes in one line\n"
 "\n"
 "Currently, both these values are advised to be a multiple of 2\n"
 "to prevent garbled display :)\n"
@@ -1056,6 +1062,15 @@ void debug_keypress() {
 	}
 }
 
+/**
+ * Handles the SIGWINCH signal upon terminal resizing.
+ */
+void handle_term_resize(int sig) {
+	clear_screen();
+	get_window_size(&(g_ec->screen_rows), &(g_ec->screen_cols));
+	editor_refresh_screen(g_ec);
+}
+
 int main(int argc, char* argv[]) {
 	char* file = NULL;
 	int octets_per_line = 16;
@@ -1094,6 +1109,12 @@ int main(int argc, char* argv[]) {
 	}
 
 	file = argv[optind];
+
+	// Signal handler to react on screen resizing.
+	struct sigaction act;
+	memset(&act, 0, sizeof(struct sigaction));
+	act.sa_handler = handle_term_resize;
+	sigaction(SIGWINCH, &act, NULL);
 
 	// Editor configuration passed around.
 	g_ec = editor_init();
