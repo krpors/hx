@@ -38,12 +38,28 @@
 #define HX_VERSION "1.0.0"
 #endif
 
+// Max length of a statusmessage, including escape sequences.
+#define EDITOR_STATUS_LEN 120
+
 // Declarations.
+
+/**
+ * Mode the editor can be in.
+ */
 enum editor_mode {
 	MODE_NORMAL,  // normal mode i.e. for navigating, commands.
 	MODE_INSERT,  // insert values at cursor position.
 	MODE_REPLACE, // replace values at cursor position.
 	MODE_COMMAND, // command input mode.
+};
+
+/**
+ * Current status severity.
+ */
+enum status_severity {
+	STATUS_INFO,    // appear as lightgray bg, black fg
+	STATUS_WARNING, // appear as yellow bg, black fg
+	STATUS_ERROR,   // appear as red bg, white fg
 };
 
 /**
@@ -78,7 +94,8 @@ struct editor {
 	char*            contents;       // the file's contents
 	int              content_length; // length of the contents
 
-	char statusmessage[80];  // status message
+	enum status_severity status_severity;                   // status severity
+	char                 status_message[EDITOR_STATUS_LEN]; // status message
 };
 
 // Utility functions.
@@ -110,7 +127,7 @@ void editor_refresh_screen(struct editor* e);
 void editor_replace_byte(struct editor* e, char x);
 void editor_scroll(struct editor* e, int units);
 void editor_setmode(struct editor *e, enum editor_mode mode);
-int  editor_statusmessage(struct editor* e, const char* fmt, ...);
+int  editor_statusmessage(struct editor* e, enum status_severity s, const char* fmt, ...);
 void editor_writefile(struct editor* e);
 
 // Global editor config.
@@ -542,9 +559,9 @@ void editor_openfile(struct editor* e, const char* filename) {
 
 	// Check if the file is readonly, and warn the user about that.
 	if (access(filename, W_OK) == -1) {
-		editor_statusmessage(e, "\"%s\" (%d bytes) [readonly]", e->filename, e->content_length);
+		editor_statusmessage(e, STATUS_WARNING, "\"%s\" (%d bytes) [readonly]", e->filename, e->content_length);
 	} else {
-		editor_statusmessage(e, "\"%s\" (%d bytes)", e->filename, e->content_length);
+		editor_statusmessage(e, STATUS_INFO, "\"%s\" (%d bytes)", e->filename, e->content_length);
 	}
 
 	fclose(fp);
@@ -558,17 +575,17 @@ void editor_writefile(struct editor* e) {
 
 	FILE* fp = fopen(e->filename, "w");
 	if (fp == NULL) {
-		editor_statusmessage(e, "Unable to open '%s' for writing: %s", e->filename, strerror(errno));
+		editor_statusmessage(e, STATUS_ERROR, "Unable to open '%s' for writing: %s", e->filename, strerror(errno));
 		return;
 	}
 
 	size_t bw = fwrite(e->contents, sizeof(char), e->content_length, fp);
 	if (bw <= 0) {
-		editor_statusmessage(e, "Unable write to file: %s", strerror(errno));
+		editor_statusmessage(e, STATUS_ERROR, "Unable write to file: %s", strerror(errno));
 		return;
 	}
 
-	editor_statusmessage(e, "\"%s\", %d bytes written", e->filename, e->content_length);
+	editor_statusmessage(e, STATUS_INFO, "\"%s\", %d bytes written", e->filename, e->content_length);
 
 	fclose(fp);
 }
@@ -594,7 +611,7 @@ void editor_delete_char_at_cursor(struct editor* e) {
 	int old_length = e->content_length;
 
 	if (e->content_length <= 0) {
-		editor_statusmessage(e, "Nothing to delete");
+		editor_statusmessage(e, STATUS_WARNING, "Nothing to delete");
 		return;
 	}
 
@@ -680,18 +697,24 @@ void editor_scroll(struct editor* e, int units) {
 void editor_setmode(struct editor* e, enum editor_mode mode) {
 	e->mode = mode;
 	switch (e->mode) {
-	case MODE_NORMAL:  editor_statusmessage(e, ""); break;
-	case MODE_INSERT:  editor_statusmessage(e, "-- INSERT --"); break;
-	case MODE_REPLACE: editor_statusmessage(e, "-- REPLACE --"); break;
+	case MODE_NORMAL:  editor_statusmessage(e, STATUS_INFO, ""); break;
+	case MODE_INSERT:  editor_statusmessage(e, STATUS_INFO, "-- INSERT --"); break;
+	case MODE_REPLACE: editor_statusmessage(e, STATUS_INFO, "-- REPLACE --"); break;
 	case MODE_COMMAND: return; // nothing.
 	}
 }
 
-int editor_statusmessage(struct editor* e, const char* fmt, ...) {
+/**
+ * Sets statusmessage, including color depending on severity.
+ */
+int editor_statusmessage(struct editor* e, enum status_severity sev, const char* fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
-	int x = vsnprintf(e->statusmessage, 80, fmt, ap);
+	int x = vsnprintf(e->status_message, EDITOR_STATUS_LEN, fmt, ap);
 	va_end(ap);
+
+	e->status_severity = sev;
+
 	return x;
 }
 
@@ -862,6 +885,29 @@ void editor_render_ruler(struct editor* e, struct buffer* b) {
 }
 
 /**
+ * Renders the status line to the buffer `b'.
+ */
+void editor_render_status(struct editor* e, struct buffer* b) {
+	// buf holds the string for the cursor movement.
+	char buf[20];
+	int bw = snprintf(buf, sizeof(buf), "\x1b[%d;0H", e->screen_rows);
+	buffer_append(b, buf, bw);
+
+	// Set color, write status message, and reset the color after.
+	switch (e->status_severity) {
+	case STATUS_INFO:    buffer_append(b, "\x1b[0;30;47m", 10); break; // black on white
+	case STATUS_WARNING: buffer_append(b, "\x1b[0;30;43m", 10); break; // black on yellow
+	case STATUS_ERROR:   buffer_append(b, "\x1b[1;37;41m", 10); break; // white on red
+	//               bold/increased intensity__/ /  /
+	//                   foreground color_______/  /
+	//                      background color______/
+	}
+
+	buffer_append(b, e->status_message, strlen(e->status_message));
+	buffer_append(b, "\x1b[0m", 4);
+}
+
+/**
  * Refreshes the screen. It uses a temporary buffer to write everything that's
  * eligible for display to an internal buffer, and then 'draws' it to the screen
  * in one call.
@@ -875,14 +921,7 @@ void editor_refresh_screen(struct editor* e) {
 	buffer_append(b, "\x1b[H", 3); // move the cursor top left
 
 	editor_render_contents(e, b);
-
-	// Move down to write the status message.
-	bw = snprintf(buf, sizeof(buf), "\x1b[%d;0H", e->screen_rows);
-	buffer_append(b, buf, bw);
-	// Change the color
-	buffer_append(b, "\x1b[0;30;47m", 10);
-	buffer_append(b, e->statusmessage, strlen(e->statusmessage));
-	buffer_append(b, "\x1b[0m", 4);
+	editor_render_status(e, b);
 
 	// Ruler: move to the right of the screen etc.
 	editor_render_ruler(e, b);
@@ -993,12 +1032,12 @@ void editor_process_keypress(struct editor* e) {
 	} else if (e->mode == MODE_REPLACE) {
 		// Check if the input character was a valid hex value. If not, return prematurely.
 		if (!ishex(c)) {
-			editor_statusmessage(e, "'%c' is not valid hex", c);
+			editor_statusmessage(e, STATUS_ERROR, "'%c' is not valid hex", c);
 			return;
 		}
 		int next = read_key();
 		if (!ishex(next)) {
-			editor_statusmessage(e, "'%c' is not valid hex", next);
+			editor_statusmessage(e, STATUS_ERROR, "'%c' is not valid hex", next);
 			return;
 		}
 
@@ -1008,7 +1047,7 @@ void editor_process_keypress(struct editor* e) {
 		char ashex = hex2bin(crud);
 		fprintf(stderr, "%s = %c\n", crud, ashex);
 		editor_replace_byte(e, ashex);
-		editor_statusmessage(e, "Replaced byte at offset %09x with %02x", offset, (unsigned char)ashex);
+		editor_statusmessage(e, STATUS_INFO, "Replaced byte at offset %09x with %02x", offset, (unsigned char)ashex);
 	} else if (e->mode == MODE_COMMAND) {
 		// Input manual, typed commands.
 	}
@@ -1030,7 +1069,7 @@ struct editor* editor_init() {
 	e->contents = NULL;
 	e->content_length = 0;
 
-	memset(e->statusmessage, 0, sizeof(e->statusmessage));
+	memset(e->status_message, 0, EDITOR_STATUS_LEN);
 
 	e->mode = MODE_NORMAL;
 
