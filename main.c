@@ -334,8 +334,9 @@ void enable_raw_mode() {
 	// control chars - set return condition: min number of bytes and timer.
 	// Return each byte, or zero for timeout.
 	raw.c_cc[VMIN] = 0;
-	// 100 ms timeout (unit is tens of second).
-	raw.c_cc[VTIME] = 0;
+	// 100 ms timeout (unit is tens of second). Do not set this to 0 for
+	// whatever reason, because this will skyrocket the cpu usage to 100%!
+	raw.c_cc[VTIME] = 1;
 
     // put terminal in raw mode after flushing
 	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) != 0) {
