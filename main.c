@@ -38,9 +38,6 @@
 #define HX_VERSION "1.0.0"
 #endif
 
-// Max length of a statusmessage, including escape sequences.
-#define EDITOR_STATUS_LEN 120
-
 // Declarations.
 
 /**
@@ -95,7 +92,7 @@ struct editor {
 	int              content_length; // length of the contents
 
 	enum status_severity status_severity;                   // status severity
-	char                 status_message[EDITOR_STATUS_LEN]; // status message
+	char                 status_message[120]; // status message
 };
 
 // Utility functions.
@@ -121,6 +118,7 @@ void editor_move_cursor(struct editor* e, int dir, int amount);
 int  editor_offset_at_cursor(struct editor* e);
 void editor_openfile(struct editor* e, const char* filename);
 void editor_process_keypress(struct editor* e);
+void editor_render_ascii(struct editor* e, int rownum, const char* ascii, struct buffer* b);
 void editor_render_contents(struct editor* e, struct buffer* b);
 void editor_render_ruler(struct editor* e, struct buffer* buf);
 void editor_refresh_screen(struct editor* e);
@@ -573,7 +571,7 @@ void editor_openfile(struct editor* e, const char* filename) {
 void editor_writefile(struct editor* e) {
 	assert(e->filename != NULL);
 
-	FILE* fp = fopen(e->filename, "w");
+	FILE* fp = fopen(e->filename, "wb");
 	if (fp == NULL) {
 		editor_statusmessage(e, STATUS_ERROR, "Unable to open '%s' for writing: %s", e->filename, strerror(errno));
 		return;
@@ -710,12 +708,43 @@ void editor_setmode(struct editor* e, enum editor_mode mode) {
 int editor_statusmessage(struct editor* e, enum status_severity sev, const char* fmt, ...) {
 	va_list ap;
 	va_start(ap, fmt);
-	int x = vsnprintf(e->status_message, EDITOR_STATUS_LEN, fmt, ap);
+	int x = vsnprintf(e->status_message, sizeof(e->status_message), fmt, ap);
 	va_end(ap);
 
 	e->status_severity = sev;
 
 	return x;
+}
+
+/**
+ * Renders the given ASCII string, `asc' to the buffer `b'. The `rownum'
+ * specified should be the row number being rendered in an iteration in
+ * editor_render_contents. This function will render the selected byte
+ * with a different color in the ASCII row to easily identify which
+ * byte is being highlighted.
+ */
+void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct buffer* b) {
+	assert(rownum > 0);
+
+	// If the rownum given is the current y cursor position, then render the line
+	// differently from the rest.
+	if (rownum == e->cursor_y) {
+		// Check the cursor position on the x axis
+		for (int i = 0; i < strlen(asc); i++) {
+			char x[1];
+			if (i+1 == e->cursor_x) {
+				// Highlight by 'inverting' the color
+				buffer_append(b, "\x1b[30;47m", 8);
+			} else {
+				// Other characters with greenish
+				buffer_append(b, "\x1b[32;40;1m", 10);
+			}
+			x[0] = asc[i];
+			buffer_append(b, x, 1);
+		}
+	} else {
+		buffer_append(b, asc, strlen(asc));
+	}
 }
 
 
@@ -759,6 +788,7 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 	}
 
 	int offset;
+	int row = 0;
 	for (offset = start_offset; offset < end_offset; offset++) {
 		if (offset % e->octets_per_line == 0) {
 			// start of a new row, beginning with an offset address in hex.
@@ -767,6 +797,7 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 			// Initialize the ascii buffer to all zeroes, and reset the row char count.
 			memset(asc, 0, sizeof(asc));
 			row_char_count = 0;
+			row++;
 		}
 
 		// Format a hex string of the current character in the offset.
@@ -793,30 +824,10 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 		row_char_count += 2;
 
 		// If we reached the end of a 'row', start writing the ASCII equivalents
-		// of the 'row', in a different color. Then hit CRLF to go to the next line.
+		// of the 'row'. Highlight the current line and offset on the ASCII part.
 		if ((offset+1) % e->octets_per_line == 0) {
 			buffer_append(b, "  ", 2);
-
-			// Alternate colors here.
-			// TODO: Currently this is very naive.
-			bool swap = false;
-			for (int i = 0; i < strlen(asc); i++) {
-				if (i % e->grouping == 0) {
-					//buffer_append(b, " ", 1);
-					swap = !swap;
-				}
-
-				// TODO: the color sequences are written EVERY LOOP!!
-				if (swap) {
-					buffer_append(b, "\x1b[0;36m", 7);
-				} else {
-					buffer_append(b, "\x1b[0;37m", 7);
-				}
-
-				char buf[2];
-				snprintf(buf, 2, "%c",  asc[i]);
-				buffer_append(b, buf, 1);
-			}
+			editor_render_ascii(e, row, asc, b);
 			buffer_append(b, "\r\n", 2);
 		}
 	}
@@ -833,8 +844,9 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 		char* padding = malloc(padding_size * sizeof(char));
 		memset(padding, ' ', padding_size);
 		buffer_append(b, padding, padding_size);
-		buffer_append(b, "\e[1;32m  ", 10);
-		buffer_append(b, asc, strlen(asc));
+		buffer_append(b, "\x1b[0m  ", 6);
+		// render cursor on the ascii when applicable.
+		editor_render_ascii(e, row, asc, b);
 		free(padding);
 	}
 
@@ -845,7 +857,7 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 	int len = 256;
 	char debug[len];
 	memset(debug, 0, len);
-	snprintf(debug, len, "\x1b[37m\x1b[1;80HRows: %d, start offset: %09x, end offset: %09x", e->screen_rows, start_offset, end_offset);
+	snprintf(debug, len, "\x1b[0m\x1b[37m\x1b[1;80HRows: %d, start offset: %09x, end offset: %09x", e->screen_rows, start_offset, end_offset);
 	buffer_append(b, debug, len);
 
 	memset(debug, 0, len);
@@ -1064,7 +1076,6 @@ void editor_process_keypress(struct editor* e) {
 		char crud[2 + 1];
 		snprintf(crud, sizeof(crud), "%c%c", (char)c, (char)next);
 		char ashex = hex2bin(crud);
-		fprintf(stderr, "%s = %c\n", crud, ashex);
 		editor_replace_byte(e, ashex);
 		editor_statusmessage(e, STATUS_INFO, "Replaced byte at offset %09x with %02x", offset, (unsigned char)ashex);
 	} else if (e->mode == MODE_COMMAND) {
@@ -1088,7 +1099,7 @@ struct editor* editor_init() {
 	e->contents = NULL;
 	e->content_length = 0;
 
-	memset(e->status_message, 0, EDITOR_STATUS_LEN);
+	memset(e->status_message, 0, sizeof(e->status_message));
 
 	e->mode = MODE_NORMAL;
 
