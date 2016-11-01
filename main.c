@@ -744,6 +744,7 @@ void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct b
 			buffer_append(b, x, 1);
 		}
 	} else {
+		buffer_append(b, "\x1b[1;37m", 7);
 		buffer_append(b, asc, strlen(asc));
 	}
 }
