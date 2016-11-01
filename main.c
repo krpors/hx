@@ -235,7 +235,7 @@ void print_version() {
  * will be read properly as well (e.g. DEL will be the bytes 0x1b, 0x5b, 0x33, 0x7e).
  * The returned integer will contain either one of the enum values, or the key pressed.
  *
- * read_key() will only return the correct key code.
+ * read_key() will only return the correct key code, or -1 when anything fails.
  */
 int read_key() {
 	char c;
@@ -243,7 +243,15 @@ int read_key() {
 	// check == 0 to see if EOF.
 	while ((nread = read(STDIN_FILENO, &c, 1)) == 0);
 	if (nread == -1) {
-		perror("Unable to read from stdin");
+		// This error may happen when a SIGWINCH is received by resizing the terminal.
+		// The read() call is interrupted and will fail here. In that case, just return
+		// -1 prematurely and continue the main loop. In all other cases, this will
+		// be unexpected so inform the user that something has happened.
+		if (errno == EINTR) {
+			return -1;
+		}
+
+		fprintf(stderr, "Unable to read from stdin: %s\n", strerror(errno));
 		exit(2);
 	}
 
@@ -995,6 +1003,9 @@ void editor_replace_byte(struct editor* e, char x) {
  */
 void editor_process_keypress(struct editor* e) {
 	int c = read_key();
+	if (c == -1) {
+		return;
+	}
 
 	// Handle some keys, independent of mode we're in.
 	switch (c) {
