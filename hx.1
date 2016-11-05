@@ -2,14 +2,13 @@
 .\"
 .\" Copyright (c) 2016 Kevin Pors. See LICENSE for details.
 .\"
-
 .Dd November 04, 2016
 .Dt HX 1 1
 .Os hx 1.0.0
 
 .Sh NAME
 .Nm hx
-.Nd Tiny hex editor for virtual terminals.
+.Nd tiny hex editor for virtual terminals.
 
 .Sh SYNOPSIS
 .Nm hx
@@ -23,7 +22,9 @@ FILE
 .\" Section for description.
 .\" ===================================================================
 .Sh DESCRIPTION
-The hx utility is a hex editor made for today's virtual terminals. It
+The
+.Nm
+utility is a hex editor made for today's virtual terminals. It
 uses vim-inspired key bindings to navigate and edit the binary contents
 of a file.
 
@@ -36,7 +37,7 @@ amount of octets to display per line.
 .It Fl h
 displays help and exits.
 .It Fl v
-displays verion info and exits.
+displays version info and exits.
 .El
 
 .\" ===================================================================
@@ -46,12 +47,30 @@ displays verion info and exits.
 Open the hx binary in hex view, with default grouping of 4 bytes, and 16 octets per line.
 .Pp
 .Dl hx /usr/bin/hx
-.Pp
-The output will look like:
 .Bd -literal -offset indent
 000000000: 7f454c46 01010100 00000000 00000000  .ELF............
 000000010: 02000300 01000000 4c8d0408 34000000  ........L...4...
 000000020: b0dc0000 00000000 34002000 09002800  ........4. ...(.
+.Ed
+
+.Pp
+Specifying a grouping of 2 bytes:
+.Pp
+.Dl hx -g 2 /usr/bin/hx
+.Bd -literal -offset indent
+000000000: 7f45 4c46 0101 0100 0000 0000 0000 0000  .ELF............
+000000010: 0200 0300 0100 0000 4c8d 0408 3400 0000  ........L...4...
+.Ed
+
+.Pp
+8 byte grouping, 24 octets per line:
+.Pp
+.Dl hx -g 8 -o 24 /usr/bin/hx
+.Bd -literal -offset indent
+000000000: 7f454c4601010100 0000000000000000 0200030001000000  .ELF....................
+000000018: 4c8d040834000000 b0dc000000000000 3400200009002800  L...4...........4. ...(.
+000000030: 2500220006000000 3400000034800408 3480040820010000  %.".....4...4...4... ...
+000000048: 2001000005000000 0400000003000000 5401000054810408   ...............T...T...
 .Ed
 
 .\" ===================================================================
@@ -62,29 +81,29 @@ To navigate in the editor, the following key bindings are made available:
 .Pp
 .Bl -item -compact -offset 2n
 .It
-CTRL+Q:         : quit immediately without saving.
+CTRL+Q:    : quit immediately without saving.
 .It
-CTRL+S          : save file in-place.
+CTRL+S     : save file in-place.
 .It
-h / left        : move cursor one byte left in the buffer.
+h / left   : move cursor one byte left in the buffer.
 .It
-l / right       : move cursor one byte right in the buffer.
+l / right  : move cursor one byte right in the buffer.
 .It
-j / down        : move cursor one position up (= num_octets_per_line).
+j / down   : move cursor one position up (= num_octets_per_line).
 .It
-k / up          : move cursor one position down (= num_octets_per_line).
+k / up     : move cursor one position down (= num_octets_per_line).
 .It
-]               : increment the byte at the cursor position with 1.
+]          : increment the byte at the cursor position with 1.
 .It
-[               : decrement the byte at the cursor position with 1.
+[          : decrement the byte at the cursor position with 1.
 .It
-x               : delete byte at current cursor position.
+x          : delete byte at current cursor position.
 .It
-r               : enable REPLACE mode.
+r          : enable REPLACE mode.
 .It
-i               : enable INSERT mode (not functional yet).
+i          : enable INSERT mode (not functional yet).
 .It
-ESC             : enable COMMAND mode.
+ESC        : enable COMMAND mode.
 .El
 
 .\" ===================================================================
