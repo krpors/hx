@@ -4,14 +4,16 @@ hx_git_hash := $(shell git rev-parse --verify HEAD --short=12)
 CC=gcc
 CFLAGS=-std=c99 -Wall -O3 -ggdb -DNDEBUG -DHX_GIT_HASH=\"$(hx_git_hash)\"
 
-objects=main.o charbuf.o
+objects=main.o editor.o charbuf.o util.o
 
 # Make use of implicit rules to build the hx binary.
 hx: $(objects)
 	$(CC) -o $@ $(CFLAGS) $(objects)
 
-main.o: charbuf.o
+main.o: charbuf.o util.o
+editor.o: editor.h charbuf.o util.o
 charbuf.o: charbuf.h
+util.o: util.h
 
 hx.1.gz: hx.1
 	gzip -k hx.1
