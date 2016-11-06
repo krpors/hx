@@ -1,22 +1,36 @@
 # Read the version of the current commit.
-HX_GIT_HASH := $(shell git rev-parse --verify HEAD --short=12)
+hx_git_hash := $(shell git rev-parse --verify HEAD --short=12)
 
 CC=gcc
-CFLAGS=-std=c99 -Wall -O3 -ggdb -DNDEBUG -DHX_GIT_HASH=\"$(HX_GIT_HASH)\"
+CFLAGS=-std=c99 -Wall -O3 -ggdb -DNDEBUG -DHX_GIT_HASH=\"$(hx_git_hash)\"
 
-DEPS=
-OBJECTS=main.o
+objects=main.o charbuf.o
 
-# $@ = compilation left side of the :
-# $^ = compilation right side of the :
-# $< = first item in dependency list
+# Make use of implicit rules to build the hx binary.
+hx: $(objects)
+	$(CC) -o $@ $(CFLAGS) $(objects)
 
-%.o: %.c $(DEPS)
-	$(CC) $(CFLAGS) -c $< -o $@
+main.o: charbuf.o
+charbuf.o: charbuf.h
 
-hx: $(OBJECTS)
-	$(CC) $(CFLAGS) -o $@ $^
+hx.1.gz: hx.1
+	gzip -k hx.1
+
+.PHONY: all
+all: hx hx.1.gz
+
+.PHONY: install
+install: all
+	@[ `id -u` = 0 ] || { echo "Root required to install."; exit 1; }
+	install -s ./hx /usr/bin
+	install ./hx.1.gz /usr/share/man/man1
+
+.PHONY: uninstall
+uninstall:
+	@[ `id -u` = 0 ] || { echo "Root required to uninstall."; exit 1; }
+	rm /usr/bin/hx
+	rm /usr/share/man/man1/hx.1.gz
 
 .PHONY: clean
 clean:
-	rm -f *.o hx
+	rm -f *.o hx.1.gz hx

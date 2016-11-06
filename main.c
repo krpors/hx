@@ -1,11 +1,13 @@
 /*
- * hx - a hex editor for the terminal.
+ * This file is part of hx - a hex editor for the terminal.
  *
  * Copyright (c) 2016 Kevin Pors. See LICENSE for details.
  */
 
 // Define _POSIX_SOURCE to enable sigaction(). See `man 2 sigaction'
 #define _POSIX_SOURCE
+
+#include "charbuf.h"
 
 // C99 includes
 #include <assert.h>
@@ -60,16 +62,6 @@ enum status_severity {
 };
 
 /**
- * This buffer contains the character sequences to render the current
- * 'screen'. The buffer is changed as a whole, then written to the screen
- * in one go to prevent 'flickering' in the terminal.
- */
-struct buffer {
-	char* contents;
-	int len;
-};
-
-/**
  * This struct contains internal information of the state of the editor.
  */
 struct editor {
@@ -93,6 +85,7 @@ struct editor {
 
 	enum status_severity status_severity;                   // status severity
 	char                 status_message[120]; // status message
+
 };
 
 // Utility functions.
@@ -118,9 +111,9 @@ void editor_move_cursor(struct editor* e, int dir, int amount);
 int  editor_offset_at_cursor(struct editor* e);
 void editor_openfile(struct editor* e, const char* filename);
 void editor_process_keypress(struct editor* e);
-void editor_render_ascii(struct editor* e, int rownum, const char* ascii, struct buffer* b);
-void editor_render_contents(struct editor* e, struct buffer* b);
-void editor_render_ruler(struct editor* e, struct buffer* buf);
+void editor_render_ascii(struct editor* e, int rownum, const char* ascii, struct charbuf* b);
+void editor_render_contents(struct editor* e, struct charbuf* b);
+void editor_render_ruler(struct editor* e, struct charbuf* buf);
 void editor_refresh_screen(struct editor* e);
 void editor_replace_byte(struct editor* e, char x);
 void editor_scroll(struct editor* e, int units);
@@ -364,64 +357,6 @@ void clear_screen() {
 	int bw = snprintf(stuff, 80, "\x1b[0m\x1b[H\x1b[2J");
 	if (write(STDOUT_FILENO, stuff, bw) == -1) {
 		perror("Unable to clear screen");
-	}
-}
-
-/* ==============================================================================
- * Functions operating on the buffer struct.
- * ============================================================================*/
-
-/**
- * Create a buffer on the heap and return it.
- */
-struct buffer* buffer_create() {
-	struct buffer* b = malloc(sizeof(struct buffer));
-	if (b) {
-		b->contents = NULL;
-		b->len = 0;
-		return b;
-	} else {
-		perror("Unable to allocate size for struct buffer");
-		exit(1);
-	}
-}
-
-/**
- * Deletes the buffer's contents, and the buffer itself.
- */
-void buffer_free(struct buffer* buf) {
-	free(buf->contents);
-	free(buf);
-}
-
-/**
- * Appends `what' to the buffer, writing at most `len' bytes. Note that
- * if we use snprintf() to format a particular string, we have to subtract
- * 1 from the `len', to discard the null terminator character.
- */
-void buffer_append(struct buffer* buf, const char* what, size_t len) {
-	assert(what != NULL);
-
-	// reallocate the contents with more memory, to hold 'what'.
-	char* new = realloc(buf->contents, buf->len + len);
-	if (new == NULL) {
-		perror("Unable to realloc buffer");
-		exit(1);
-	}
-
-	// copy 'what' to the target memory
-	memcpy(new + buf->len, what, len);
-	buf->contents = new;
-	buf->len += len;
-}
-
-/**
- * Draws (writes) the buffer to the screen.
- */
-void buffer_draw(struct buffer* buf) {
-	if (write(STDOUT_FILENO, buf->contents, buf->len) == -1) {
-		perror("Can't write buffer");
-		exit(1);
 	}
 }
 
@@ -732,7 +667,7 @@ int editor_statusmessage(struct editor* e, enum status_severity sev, const char*
  * with a different color in the ASCII row to easily identify which
  * byte is being highlighted.
  */
-void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct buffer* b) {
+void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct charbuf* b) {
 	assert(rownum > 0);
 
 	// If the rownum given is the current y cursor position, then render the line
@@ -743,17 +678,17 @@ void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct b
 			char x[1];
 			if (i+1 == e->cursor_x) {
 				// Highlight by 'inverting' the color
-				buffer_append(b, "\x1b[30;47m", 8);
+				charbuf_append(b, "\x1b[30;47m", 8);
 			} else {
 				// Other characters with greenish
-				buffer_append(b, "\x1b[32;40;1m", 10);
+				charbuf_append(b, "\x1b[32;40;1m", 10);
 			}
 			x[0] = asc[i];
-			buffer_append(b, x, 1);
+			charbuf_append(b, x, 1);
 		}
 	} else {
-		buffer_append(b, "\x1b[1;37m", 7);
-		buffer_append(b, asc, strlen(asc));
+		charbuf_append(b, "\x1b[1;37m", 7);
+		charbuf_append(b, asc, strlen(asc));
 	}
 }
 
@@ -762,11 +697,11 @@ void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct b
  * Renders the contents of the current state of the editor `e'
  * to the buffer `b'.
  */
-void editor_render_contents(struct editor* e, struct buffer* b) {
+void editor_render_contents(struct editor* e, struct charbuf* b) {
 	if (e->content_length <= 0) {
 		// TODO: handle this in a better way.
-		buffer_append(b, "\x1b[2J", 4);
-		buffer_append(b, "empty", 5);
+		charbuf_append(b, "\x1b[2J", 4);
+		charbuf_append(b, "empty", 5);
 		return;
 	}
 
@@ -803,7 +738,7 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 		if (offset % e->octets_per_line == 0) {
 			// start of a new row, beginning with an offset address in hex.
 			int bwritten = snprintf(address, sizeof(address), "\e[0;33m%09x\e[0m:", offset);
-			buffer_append(b, address, bwritten);
+			charbuf_append(b, address, bwritten);
 			// Initialize the ascii buffer to all zeroes, and reset the row char count.
 			memset(asc, 0, sizeof(asc));
 			row_char_count = 0;
@@ -825,20 +760,20 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 
 		// Every 'group' count, write a separator space.
 		if (offset % e->grouping == 0) {
-			buffer_append(b, " ", 1);
+			charbuf_append(b, " ", 1);
 			row_char_count++;
 		}
 
 		// First, write the hex value of the byte at the current offset.
-		buffer_append(b, hex, 2);
+		charbuf_append(b, hex, 2);
 		row_char_count += 2;
 
 		// If we reached the end of a 'row', start writing the ASCII equivalents
 		// of the 'row'. Highlight the current line and offset on the ASCII part.
 		if ((offset+1) % e->octets_per_line == 0) {
-			buffer_append(b, "  ", 2);
+			charbuf_append(b, "  ", 2);
 			editor_render_ascii(e, row, asc, b);
-			buffer_append(b, "\r\n", 2);
+			charbuf_append(b, "\r\n", 2);
 		}
 	}
 
@@ -853,42 +788,42 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
 		int padding_size = (e->octets_per_line * 2) + (e->octets_per_line / e->grouping) - row_char_count;
 		char* padding = malloc(padding_size * sizeof(char));
 		memset(padding, ' ', padding_size);
-		buffer_append(b, padding, padding_size);
-		buffer_append(b, "\x1b[0m  ", 6);
+		charbuf_append(b, padding, padding_size);
+		charbuf_append(b, "\x1b[0m  ", 6);
 		// render cursor on the ascii when applicable.
 		editor_render_ascii(e, row, asc, b);
 		free(padding);
 	}
 
 	// clear everything up until the end
-	buffer_append(b, "\x1b[0J", 4);
+	charbuf_append(b, "\x1b[0J", 4);
 
 #ifndef NDEBUG
 	int len = 256;
 	char debug[len];
 	memset(debug, 0, len);
 	snprintf(debug, len, "\x1b[0m\x1b[37m\x1b[1;80HRows: %d, start offset: %09x, end offset: %09x", e->screen_rows, start_offset, end_offset);
-	buffer_append(b, debug, len);
+	charbuf_append(b, debug, len);
 
 	memset(debug, 0, len);
 	snprintf(debug, len, "\e[2;80H(cur_y,cur_x)=(%d,%d)", e->cursor_y, e->cursor_x);
-	buffer_append(b, debug, len);
+	charbuf_append(b, debug, len);
 
 	memset(debug, 0, len);
 	snprintf(debug, len, "\e[3;80HHex line width: %d", e->hex_line_width);
-	buffer_append(b, debug, len);
+	charbuf_append(b, debug, len);
 
 	memset(debug, 0, len);
 	int curr_offset = editor_offset_at_cursor(e);
 	snprintf(debug, len, "\e[4;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", e->line, curr_offset, (unsigned char) e->contents[curr_offset]);
-	buffer_append(b, debug, len);
+	charbuf_append(b, debug, len);
 
 	memset(debug, 0, len);
 	int xx;
 	int yy;
 	editor_cursor_at_offset(e, curr_offset, &xx, &yy);
 	snprintf(debug, len, "\e[5;80H\e[0Kyy,xx = %d, %d", yy, xx);
-	buffer_append(b, debug, len);
+	charbuf_append(b, debug, len);
 #endif
 }
 
@@ -897,7 +832,7 @@ void editor_render_contents(struct editor* e, struct buffer* b) {
  * the current offset in hex and in base 10, the byte at the current
  * cursor position, and how far the cursor is in the file (as a percentage).
  */
-void editor_render_ruler(struct editor* e, struct buffer* b) {
+void editor_render_ruler(struct editor* e, struct charbuf* b) {
 	// Nothing to see. No address, no byte, no percentage. It's all a plain
 	// dark void right now. Oblivion. No data to see here, move along.
 	if (e->content_length <= 0) {
@@ -921,31 +856,31 @@ void editor_render_ruler(struct editor* e, struct buffer* b) {
 	int cpbw = snprintf(buf, sizeof(buf), "\x1b[0m\x1b[%d;%dH", e->screen_rows, e->screen_cols - rmbw);
 
 	// First write the cursor string, followed by the ruler message.
-	buffer_append(b, buf, cpbw);
-	buffer_append(b, rulermsg, rmbw);
+	charbuf_append(b, buf, cpbw);
+	charbuf_append(b, rulermsg, rmbw);
 }
 
 /**
  * Renders the status line to the buffer `b'.
  */
-void editor_render_status(struct editor* e, struct buffer* b) {
+void editor_render_status(struct editor* e, struct charbuf* b) {
 	// buf holds the string for the cursor movement.
 	char buf[20];
 	int bw = snprintf(buf, sizeof(buf), "\x1b[%d;0H", e->screen_rows);
-	buffer_append(b, buf, bw);
+	charbuf_append(b, buf, bw);
 
 	// Set color, write status message, and reset the color after.
 	switch (e->status_severity) {
-	case STATUS_INFO:    buffer_append(b, "\x1b[0;30;47m", 10); break; // black on white
-	case STATUS_WARNING: buffer_append(b, "\x1b[0;30;43m", 10); break; // black on yellow
-	case STATUS_ERROR:   buffer_append(b, "\x1b[1;37;41m", 10); break; // white on red
+	case STATUS_INFO:    charbuf_append(b, "\x1b[0;30;47m", 10); break; // black on white
+	case STATUS_WARNING: charbuf_append(b, "\x1b[0;30;43m", 10); break; // black on yellow
+	case STATUS_ERROR:   charbuf_append(b, "\x1b[1;37;41m", 10); break; // white on red
 	//               bold/increased intensity__/ /  /
 	//                   foreground color_______/  /
 	//                      background color______/
 	}
 
-	buffer_append(b, e->status_message, strlen(e->status_message));
-	buffer_append(b, "\x1b[0m", 4);
+	charbuf_append(b, e->status_message, strlen(e->status_message));
+	charbuf_append(b, "\x1b[0m", 4);
 }
 
 /**
@@ -956,10 +891,10 @@ void editor_render_status(struct editor* e, struct buffer* b) {
 void editor_refresh_screen(struct editor* e) {
 	char buf[32]; // temp buffer for snprintf.
 	int bw; // bytes written by snprintf.
-	struct buffer* b = buffer_create();
+	struct charbuf* b = charbuf_create();
 
-	buffer_append(b, "\x1b[?25l", 6);
-	buffer_append(b, "\x1b[H", 3); // move the cursor top left
+	charbuf_append(b, "\x1b[?25l", 6);
+	charbuf_append(b, "\x1b[H", 3); // move the cursor top left
 
 	editor_render_contents(e, b);
 	editor_render_status(e, b);
@@ -975,11 +910,11 @@ void editor_refresh_screen(struct editor* e) {
 	int spaces = curx / (e->grouping * 2); // determine spaces to add due to grouping.
 	int cruft = curx + spaces + 12; // 12 = the size of the address + ": "
 	bw = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", e->cursor_y, cruft);
-	buffer_append(b, buf, bw);
-	buffer_append(b, "\x1b[?25h", 6);
+	charbuf_append(b, buf, bw);
+	charbuf_append(b, "\x1b[?25h", 6);
 
-	buffer_draw(b);
-	buffer_free(b);
+	charbuf_draw(b);
+	charbuf_free(b);
 }
 
 void editor_insert(struct editor* e, char x) {
