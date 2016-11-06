@@ -47,4 +47,3 @@ report any leaks so that looks OK :)
 1. Going to offset of choice.
 1. Colorize changes made to a file
 1. Undo/redo actions
-1. Separate .c files, it's growing!
