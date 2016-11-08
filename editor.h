@@ -55,6 +55,8 @@ struct editor {
 	enum status_severity status_severity;     // status severity
 	char                 status_message[120]; // status message
 
+	char cmdbuffer[80];
+	int cmdbuffer_index;
 };
 
 // editor functions:
@@ -99,6 +101,12 @@ int editor_offset_at_cursor(struct editor* e);
 void editor_openfile(struct editor* e, const char* filename);
 
 /**
+ * Processes a manual command input when the editor mode is set
+ * to MODE_COMMAND. `c' is the character read by read_key().
+ */
+void editor_process_cmdinput(struct editor* e, char c);
+
+/**
  * Processes a keypress accordingly.
  */
 void editor_process_keypress(struct editor* e);
@@ -136,6 +144,10 @@ void editor_render_status(struct editor* e, struct charbuf* buf);
  * in one call.
  */
 void editor_refresh_screen(struct editor* e);
+
+/**
+ * Replaces the byte(char) at the current selected offset with the given char.
+ */
 void editor_replace_byte(struct editor* e, char x);
 
 /**
@@ -143,6 +155,10 @@ void editor_replace_byte(struct editor* e, char x);
  * the bounds of the readable parts of the buffer.
  */
 void editor_scroll(struct editor* e, int units);
+
+/**
+ * Sets editor to mode to one of the modes defined in the enum.
+ */
 void editor_setmode(struct editor *e, enum editor_mode mode);
 
 /**

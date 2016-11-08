@@ -12,10 +12,12 @@
 
 // Key enumeration, returned by read_key().
 enum key_codes {
-	KEY_NULL     = 0,
-	KEY_CTRL_Q   = 0x11, // DC1, to exit the program.
-	KEY_CTRL_S   = 0x13, // DC2, to save the current buffer.
-	KEY_ESC      = 0x1b, // ESC, for things like keys up, down, left, right, delete, ...
+	KEY_NULL      = 0,
+	KEY_CTRL_Q    = 0x11, // DC1, to exit the program.
+	KEY_CTRL_S    = 0x13, // DC2, to save the current buffer.
+	KEY_ESC       = 0x1b, // ESC, for things like keys up, down, left, right, delete, ...
+	KEY_ENTER     = 0x0d,
+	KEY_BACKSPACE = 0x7f,
 
 	// 'Virtual keys', i.e. not corresponding to terminal escape sequences
 	// or any other ANSI stuff. Merely to identify keys returned by read_key().
@@ -23,6 +25,7 @@ enum key_codes {
 	KEY_DOWN,           // [B
 	KEY_RIGHT,          // [C
 	KEY_LEFT,           // [D
+	KEY_DEL,            // . = 1b, [ = 5b, 3 = 33, ~ = 7e,
 	KEY_HOME,           // [H
 	KEY_END,            // [F
 	KEY_PAGEUP,         // ??

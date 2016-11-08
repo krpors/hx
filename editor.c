@@ -205,6 +205,8 @@ void editor_delete_char_at_cursor(struct editor* e) {
 		editor_move_cursor(e, KEY_LEFT, 1);
 	}
 }
+
+
 void editor_increment_byte(struct editor* e, int amount) {
 	int offset = editor_offset_at_cursor(e);
 	e->contents[offset] += amount;
@@ -258,7 +260,7 @@ void editor_setmode(struct editor* e, enum editor_mode mode) {
 	case MODE_NORMAL:  editor_statusmessage(e, STATUS_INFO, ""); break;
 	case MODE_INSERT:  editor_statusmessage(e, STATUS_INFO, "-- INSERT --"); break;
 	case MODE_REPLACE: editor_statusmessage(e, STATUS_INFO, "-- REPLACE --"); break;
-	case MODE_COMMAND: return; // nothing.
+	case MODE_COMMAND: break;
 	}
 }
 
@@ -298,6 +300,9 @@ void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct c
 		charbuf_append(b, "\x1b[1;37m", 7);
 		charbuf_append(b, asc, strlen(asc));
 	}
+}
+
+void editor_render_cmd(struct editor* e) {
 }
 
 
@@ -446,6 +451,9 @@ void editor_render_ruler(struct editor* e, struct charbuf* b) {
 	unsigned char val = e->contents[offset_at_cursor];
 	int percentage = (float)(offset_at_cursor + 1) / (float)e->content_length * 100;
 
+	// TODO: move cursor down etc to remain independent on the previous cursor
+	// movement in refresh_screen().
+
 	// Create a ruler string. We need to calculate the amount of bytes
 	// we've actually written, to subtract that from the screen_cols to
 	// align the string properly.
@@ -472,9 +480,9 @@ void editor_render_status(struct editor* e, struct charbuf* b) {
 	case STATUS_INFO:    charbuf_append(b, "\x1b[0;30;47m", 10); break; // black on white
 	case STATUS_WARNING: charbuf_append(b, "\x1b[0;30;43m", 10); break; // black on yellow
 	case STATUS_ERROR:   charbuf_append(b, "\x1b[1;37;41m", 10); break; // white on red
-	//               bold/increased intensity__/ /  /
-	//                   foreground color_______/  /
-	//                      background color______/
+	//                bold/increased intensity__/ /  /
+	//                    foreground color_______/  /
+	//                       background color______/
 	}
 
 	charbuf_append(b, e->status_message, strlen(e->status_message));
@@ -490,21 +498,35 @@ void editor_refresh_screen(struct editor* e) {
 	charbuf_append(b, "\x1b[?25l", 6);
 	charbuf_append(b, "\x1b[H", 3); // move the cursor top left
 
-	editor_render_contents(e, b);
-	editor_render_status(e, b);
+	if (e->mode == MODE_REPLACE || e->mode == MODE_NORMAL) {
+		editor_render_contents(e, b);
+		editor_render_status(e, b);
 
-	// Ruler: move to the right of the screen etc.
-	editor_render_ruler(e, b);
+		// Ruler: move to the right of the screen etc.
+		editor_render_ruler(e, b);
 
-	// Position cursor. This is done by taking into account the current
-	// cursor position (1 .. 40), and the amount of spaces to add due to
-	// grouping.
-	// TODO: this is currently a bit hacky and/or out of place.
-	int curx = (e->cursor_x - 1) * 2; // times 2 characters to represent a byte in hex
-	int spaces = curx / (e->grouping * 2); // determine spaces to add due to grouping.
-	int cruft = curx + spaces + 12; // 12 = the size of the address + ": "
-	bw = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", e->cursor_y, cruft);
-	charbuf_append(b, buf, bw);
+		// Position cursor. This is done by taking into account the current
+		// cursor position (1 .. 40), and the amount of spaces to add due to
+		// grouping.
+		// TODO: this is currently a bit hacky and/or out of place.
+		int curx = (e->cursor_x - 1) * 2; // times 2 characters to represent a byte in hex
+		int spaces = curx / (e->grouping * 2); // determine spaces to add due to grouping.
+		int cruft = curx + spaces + 12; // 12 = the size of the address + ": "
+		bw = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", e->cursor_y, cruft);
+		charbuf_append(b, buf, bw);
+	} else if (e->mode == MODE_COMMAND) {
+		// When in command mode, handle rendering different. For instance,
+		// the cursor is placed at the bottom. Ruler is not required.
+		int cpbw = snprintf(buf, sizeof(buf), "\x1b[0m\x1b[%d;1H", e->screen_rows);
+		charbuf_append(b, buf, cpbw);
+		charbuf_append(b, "\x1b[2K:", 5); // clear entire line
+
+		charbuf_append(b, e->cmdbuffer, e->cmdbuffer_index);
+		// 1. move cursor to bottom.
+		// 2. read input
+		// 3. execute
+	}
+
 	charbuf_append(b, "\x1b[?25h", 6);
 
 	charbuf_draw(b);
@@ -530,6 +552,38 @@ void editor_replace_byte(struct editor* e, char x) {
 }
 
 
+void editor_process_cmdinput(struct editor* e, char c) {
+	// if we hit enter, set the mode to normal mode, execute
+	// the command, and possibly set a statusmessage.
+	if (c == KEY_ENTER) {
+		editor_setmode(e, MODE_NORMAL);
+		fprintf(stderr, "what: %s\n", e->cmdbuffer);
+		editor_statusmessage(e, STATUS_ERROR, "Command not found: %s", e->cmdbuffer);
+		e->cmdbuffer_index = 0;
+		memset(e->cmdbuffer, 0, sizeof(e->cmdbuffer));
+		return;
+	}
+
+	// Safety guard. Our cmdbuffer size is limited to 180 chars, so stop incrementing
+	// our buffer index after this maximum.
+	if (e->cmdbuffer_index >= sizeof(e->cmdbuffer)) {
+		return;
+	}
+
+	if (c == KEY_BACKSPACE && e->cmdbuffer_index > 0) {
+		e->cmdbuffer[e->cmdbuffer_index] = '\0';
+		e->cmdbuffer_index--;
+	}
+
+	// Only act on printable characters.
+	if (!isprint(c)) {
+		return;
+	}
+
+	e->cmdbuffer[e->cmdbuffer_index++] = c;
+}
+
+
 void editor_process_keypress(struct editor* e) {
 	int c = read_key();
 	if (c == -1) {
@@ -538,42 +592,36 @@ void editor_process_keypress(struct editor* e) {
 
 	// Handle some keys, independent of mode we're in.
 	switch (c) {
-	case KEY_ESC: editor_setmode(e, MODE_NORMAL); return;
-	case KEY_CTRL_Q:   exit(0); return;
-	case KEY_CTRL_S:   editor_writefile(e); return;
-
-	case KEY_UP:
-	case KEY_DOWN:
-	case KEY_RIGHT:
-	case KEY_LEFT:     editor_move_cursor(e, c, 1); return;
-
-	case KEY_HOME:     e->cursor_x = 1; return;
-	case KEY_END:      e->cursor_x = e->octets_per_line; return;
-	case KEY_PAGEUP:   editor_scroll(e, -(e->screen_rows) + 2); return;
-	case KEY_PAGEDOWN: editor_scroll(e, e->screen_rows - 2); return;
+	case KEY_ESC:    editor_setmode(e, MODE_NORMAL); return;
+	case KEY_CTRL_Q: exit(0); return;
+	case KEY_CTRL_S: editor_writefile(e); return;
 	}
 
 	// Handle commands when in normal mode.
 	if (e->mode == MODE_NORMAL) {
 		switch (c) {
-		// vi(m) like movement:
+		// cursor movement:
+		case KEY_UP:
+		case KEY_DOWN:
+		case KEY_RIGHT:
+		case KEY_LEFT: editor_move_cursor(e, c, 1); break;
+
 		case 'h': editor_move_cursor(e, KEY_LEFT,  1); break;
 		case 'j': editor_move_cursor(e, KEY_DOWN,  1); break;
 		case 'k': editor_move_cursor(e, KEY_UP,    1); break;
 		case 'l': editor_move_cursor(e, KEY_RIGHT, 1); break;
-		case 'x':
-			editor_delete_char_at_cursor(e);
-			break;
-		case 'i':
-			editor_setmode(e, MODE_INSERT); break;
-		case 'r':
-			editor_setmode(e, MODE_REPLACE); break;
-		case 'b':
-			// Move one group back.
-			editor_move_cursor(e, KEY_LEFT, e->grouping); break;
-		case 'w':
-			// Move one group further.
-			editor_move_cursor(e, KEY_RIGHT, e->grouping); break;
+		case ']': editor_increment_byte(e, 1); break;
+		case '[': editor_increment_byte(e, -1); break;
+		case KEY_DEL:
+		case 'x': editor_delete_char_at_cursor(e); break;
+
+		case 'i': editor_setmode(e, MODE_INSERT); return;
+		case 'r': editor_setmode(e, MODE_REPLACE); return;
+		case ':': editor_setmode(e, MODE_COMMAND); return;
+
+		// move `grouping` amount back or forward:
+		case 'b': editor_move_cursor(e, KEY_LEFT, e->grouping); break;
+		case 'w': editor_move_cursor(e, KEY_RIGHT, e->grouping); break;
 		case 'G':
 			// Scroll to the end, place the cursor at the end.
 			editor_scroll(e, e->content_length);
@@ -588,15 +636,12 @@ void editor_process_keypress(struct editor* e) {
 				editor_cursor_at_offset(e, 0, &e->cursor_x, &e->cursor_y);
 			}
 			break;
-		case ']':
-			editor_increment_byte(e, 1);
-			break;
-		case '[':
-			editor_increment_byte(e, -1);
-		}
 
-		// Command parsed, do not continue.
-		return;
+		case KEY_HOME:     e->cursor_x = 1; return;
+		case KEY_END:      e->cursor_x = e->octets_per_line; return;
+		case KEY_PAGEUP:   editor_scroll(e, -(e->screen_rows) + 2); return;
+		case KEY_PAGEDOWN: editor_scroll(e, e->screen_rows - 2); return;
+		}
 	}
 
 	if (e->mode == MODE_INSERT) {
@@ -622,8 +667,10 @@ void editor_process_keypress(struct editor* e) {
 		editor_statusmessage(e, STATUS_INFO, "Replaced byte at offset %09x with %02x", offset, (unsigned char)ashex);
 	} else if (e->mode == MODE_COMMAND) {
 		// Input manual, typed commands.
+		editor_process_cmdinput(e, c);
 	}
 }
+
 /**
  * Initializes editor struct with some default values.
  */
@@ -644,6 +691,9 @@ struct editor* editor_init() {
 	memset(e->status_message, 0, sizeof(e->status_message));
 
 	e->mode = MODE_NORMAL;
+
+	memset(e->cmdbuffer, 0, sizeof(e->cmdbuffer));
+	e->cmdbuffer_index = 0;
 
 	get_window_size(&(e->screen_rows), &(e->screen_cols));
 
