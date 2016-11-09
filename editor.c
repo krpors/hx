@@ -274,7 +274,7 @@ void editor_scroll_to_offset(struct editor* e, int offset) {
 
 	editor_cursor_at_offset(e, offset, &(e->cursor_x), &(e->cursor_y));
 
-	editor_statusmessage(e, STATUS_INFO, "Positioned to offset %09x (%d)", offset, offset);
+	editor_statusmessage(e, STATUS_INFO, "Positioned to offset 0x%09x (%d)", offset, offset);
 }
 
 void editor_setmode(struct editor* e, enum editor_mode mode) {
@@ -582,7 +582,7 @@ void editor_process_cmdinput(struct editor* e, char c) {
 		editor_setmode(e, MODE_NORMAL);
 
 		do {
-			// if number then go to offset
+			// Command: go to base 10 offset
 			bool b = is_pos_num(e->cmdbuffer);
 			if (b) {
 				int offset = str2int(e->cmdbuffer, 0, e->content_length, e->content_length - 1);
@@ -590,9 +590,24 @@ void editor_process_cmdinput(struct editor* e, char c) {
 				break;
 			}
 
+			// Command: go to hex offset
+			if (e->cmdbuffer[0] == '0' && e->cmdbuffer[1] == 'x') {
+				char* ptr = strchr(e->cmdbuffer, 'x');
+				ptr++; // increase pointer, to prevent the 'x' to be included
+				int offset = hex2int(ptr);
+				if (!is_hex(ptr)) {
+					editor_statusmessage(e, STATUS_ERROR, "Error: %s is not valid base 16", ptr);
+					break;
+				}
+				offset = clampi(offset, 0, e->content_length);
+
+				editor_scroll_to_offset(e, offset);
+				break;
+			}
+
 			editor_statusmessage(e, STATUS_ERROR, "Command not found: %s", e->cmdbuffer);
 			break;
-		} while(true);
+		} while(false);
 
 		e->cmdbuffer_index = 0;
 		memset(e->cmdbuffer, 0, sizeof(e->cmdbuffer));

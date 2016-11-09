@@ -48,6 +48,36 @@ bool is_pos_num(const char* s) {
 	return true;
 }
 
+bool is_hex(const char* s) {
+	const char* ptr = s;
+	while(*++ptr) {
+		if (!isxdigit(*ptr)) {
+			return false;
+		}
+	}
+	return true;
+}
+
+int hex2int(const char* s) {
+	char* endptr;
+	intmax_t x = strtoimax(s, &endptr, 16);
+	if (errno == ERANGE) {
+		return 0;
+	}
+
+	return x;
+}
+
+inline int clampi(int i, int min, int max) {
+	if (i < min) {
+		return min;
+	}
+	if (i > max) {
+		return max;
+	}
+	return i;
+}
+
 int str2int(const char* s, int min, int max, int def) {
 	char* endptr;
 	uintmax_t x = strtoimax(s, &endptr, 10);
