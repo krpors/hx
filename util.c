@@ -39,8 +39,7 @@ int hex2bin(const char* s) {
 }
 
 bool is_pos_num(const char* s) {
-	const char* ptr = s;
-	while(*++ptr) {
+	for (const char* ptr = s; *ptr; ptr++) {
 		if (!isdigit(*ptr)) {
 			return false;
 		}
