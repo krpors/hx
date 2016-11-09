@@ -21,13 +21,6 @@
 // data garbling. See enable/disable_raw_mode().
 static struct termios orig_termios;
 
-bool ishex(const char c) {
-	return
-		(c >= '0' && c <= '9') ||
-		(c >= 'A' && c <= 'F') ||
-		(c >= 'a' && c <= 'f');
-}
-
 int hex2bin(const char* s) {
 	int ret=0;
 	for(int i = 0; i < 2; i++) {

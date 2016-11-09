@@ -684,12 +684,12 @@ void editor_process_keypress(struct editor* e) {
 		//editor_insert(e, (char) c);
 	} else if (e->mode == MODE_REPLACE) {
 		// Check if the input character was a valid hex value. If not, return prematurely.
-		if (!ishex(c)) {
+		if (!isxdigit(c)) {
 			editor_statusmessage(e, STATUS_ERROR, "'%c' is not valid hex", c);
 			return;
 		}
 		int next = read_key();
-		if (!ishex(next)) {
+		if (!isxdigit(next)) {
 			editor_statusmessage(e, STATUS_ERROR, "'%c' is not valid hex", next);
 			return;
 		}

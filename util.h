@@ -36,7 +36,6 @@ void enable_raw_mode();
 void disable_raw_mode();
 void clear_screen();
 int  read_key();
-bool ishex(const char c);
 int  hex2bin(const char* s);
 bool get_window_size(int* rows, int* cols);
 
