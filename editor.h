@@ -163,7 +163,7 @@ void editor_scroll(struct editor* e, int units);
  *
  * The cursor will be centered on the screen.
  */
-void editor_scroll_to_offset(struct editor* e, int offset);
+void editor_scroll_to_offset(struct editor* e, unsigned int offset);
 
 /**
  * Sets editor to mode to one of the modes defined in the enum.

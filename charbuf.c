@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <errno.h>
 #include <string.h>
+#include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -49,6 +50,19 @@ void charbuf_append(struct charbuf* buf, const char* what, size_t len) {
 	memcpy(new + buf->len, what, len);
 	buf->contents = new;
 	buf->len += len;
+}
+
+int charbuf_appendf(struct charbuf* buf, const char* fmt, ...) {
+	// We use a fixed size buffer. We don't need to fmt a lot
+	// of characters anyway.
+	char buffer[CHARBUF_APPENDF_SIZE];
+	va_list ap;
+	va_start(ap, fmt);
+	int len = vsnprintf(buffer, sizeof(buffer), fmt, ap);
+	va_end(ap);
+
+	charbuf_append(buf, buffer, len);
+	return len;
 }
 
 /**

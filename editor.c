@@ -254,7 +254,12 @@ void editor_scroll(struct editor* e, int units) {
 	}
 }
 
-void editor_scroll_to_offset(struct editor* e, int offset) {
+void editor_scroll_to_offset(struct editor* e, unsigned int offset) {
+	if (offset < 0 || offset > e->content_length) {
+		editor_statusmessage(e, STATUS_ERROR, "Out of range: 0x%09x (%u)", offset, offset);
+		return;
+	}
+
 	// Determine what 'line' to set, by dividing the offset to
 	// be displayed by the number of octets per line. The line
 	// is subtracted with the number of rows in the screen, divided
@@ -338,7 +343,6 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	}
 
 	// FIXME: proper sizing of these arrays (malloc?)
-	char address[80];  // example: 000000040
 	char hex[ 2 + 1];  // example: 65
 	char asc[256 + 1]; // example: Hello.World!
 
@@ -369,8 +373,7 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	for (offset = start_offset; offset < end_offset; offset++) {
 		if (offset % e->octets_per_line == 0) {
 			// start of a new row, beginning with an offset address in hex.
-			int bwritten = snprintf(address, sizeof(address), "\e[0;33m%09x\e[0m:", offset);
-			charbuf_append(b, address, bwritten);
+			charbuf_appendf(b, "\x1b[0;33m%09x\e[0m:", offset);
 			// Initialize the ascii buffer to all zeroes, and reset the row char count.
 			memset(asc, 0, sizeof(asc));
 			row_char_count = 0;
@@ -431,31 +434,12 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	charbuf_append(b, "\x1b[0J", 4);
 
 #ifndef NDEBUG
-	int len = 256;
-	char debug[len];
-	memset(debug, 0, len);
-	snprintf(debug, len, "\x1b[0m\x1b[37m\x1b[1;80HRows: %d, start offset: %09x, end offset: %09x", e->screen_rows, start_offset, end_offset);
-	charbuf_append(b, debug, len);
-
-	memset(debug, 0, len);
-	snprintf(debug, len, "\e[2;80H(cur_y,cur_x)=(%d,%d)", e->cursor_y, e->cursor_x);
-	charbuf_append(b, debug, len);
-
-	memset(debug, 0, len);
-	snprintf(debug, len, "\e[3;80HHex line width: %d", e->hex_line_width);
-	charbuf_append(b, debug, len);
-
-	memset(debug, 0, len);
+	charbuf_appendf(b, "\e[0m\e[1;35m\e[1;80HRows: %d", e->screen_rows);
+	charbuf_appendf(b, "\e[0K\e[2;80HOffset: %09x - %09x", start_offset, end_offset);
+	charbuf_appendf(b, "\e[0K\e[3;80H(y,x)=(%d,%d)", e->cursor_y, e->cursor_x);
+	charbuf_appendf(b, "\e[0K\e[4;80HHex line width: %d", e->hex_line_width);
 	int curr_offset = editor_offset_at_cursor(e);
-	snprintf(debug, len, "\e[4;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", e->line, curr_offset, (unsigned char) e->contents[curr_offset]);
-	charbuf_append(b, debug, len);
-
-	memset(debug, 0, len);
-	int xx;
-	int yy;
-	editor_cursor_at_offset(e, curr_offset, &xx, &yy);
-	snprintf(debug, len, "\e[5;80H\e[0Kyy,xx = %d, %d", yy, xx);
-	charbuf_append(b, debug, len);
+	charbuf_appendf(b, "\e[0K\e[5;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", e->line, curr_offset, (unsigned char) e->contents[curr_offset]);
 #endif
 }
 
@@ -493,10 +477,7 @@ void editor_render_ruler(struct editor* e, struct charbuf* b) {
 
 
 void editor_render_status(struct editor* e, struct charbuf* b) {
-	// buf holds the string for the cursor movement.
-	char buf[20];
-	int bw = snprintf(buf, sizeof(buf), "\x1b[%d;0H", e->screen_rows);
-	charbuf_append(b, buf, bw);
+	charbuf_appendf(b, "\x1b[%d;0H", e->screen_rows);
 
 	// Set color, write status message, and reset the color after.
 	switch (e->status_severity) {
@@ -514,8 +495,6 @@ void editor_render_status(struct editor* e, struct charbuf* b) {
 
 
 void editor_refresh_screen(struct editor* e) {
-	char buf[32]; // temp buffer for snprintf.
-	int bw; // bytes written by snprintf.
 	struct charbuf* b = charbuf_create();
 
 	charbuf_append(b, "\x1b[?25l", 6);
@@ -535,19 +514,13 @@ void editor_refresh_screen(struct editor* e) {
 		int curx = (e->cursor_x - 1) * 2; // times 2 characters to represent a byte in hex
 		int spaces = curx / (e->grouping * 2); // determine spaces to add due to grouping.
 		int cruft = curx + spaces + 12; // 12 = the size of the address + ": "
-		bw = snprintf(buf, sizeof(buf), "\x1b[%d;%dH", e->cursor_y, cruft);
-		charbuf_append(b, buf, bw);
+		charbuf_appendf(b, "\x1b[%d;%dH", e->cursor_y, cruft);
 	} else if (e->mode == MODE_COMMAND) {
 		// When in command mode, handle rendering different. For instance,
 		// the cursor is placed at the bottom. Ruler is not required.
-		int cpbw = snprintf(buf, sizeof(buf), "\x1b[0m\x1b[%d;1H", e->screen_rows);
-		charbuf_append(b, buf, cpbw);
-		charbuf_append(b, "\x1b[2K:", 5); // clear entire line
-
+		// After moving the cursor, clear the entire line ([2K).
+		charbuf_appendf(b, "\x1b[0m\x1b[%d;1H\x1b[2K:", e->screen_rows);
 		charbuf_append(b, e->cmdbuffer, e->cmdbuffer_index);
-		// 1. move cursor to bottom.
-		// 2. read input
-		// 3. execute
 	}
 
 	charbuf_append(b, "\x1b[?25h", 6);
@@ -599,7 +572,7 @@ void editor_process_cmdinput(struct editor* e, char c) {
 					editor_statusmessage(e, STATUS_ERROR, "Error: %s is not valid base 16", ptr);
 					break;
 				}
-				offset = clampi(offset, 0, e->content_length);
+
 
 				editor_scroll_to_offset(e, offset);
 				break;

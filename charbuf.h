@@ -9,6 +9,7 @@
 #ifndef _HX_CHARBUF
 #define _HX_CHARBUF
 
+static const int CHARBUF_APPENDF_SIZE = 1024;
 
 /**
  * This charbuf contains the character sequences to render the current
@@ -37,6 +38,16 @@ void charbuf_free(struct charbuf* buf);
  * 1 from the `len', to discard the null terminator character.
  */
 void charbuf_append(struct charbuf* buf, const char* what, size_t len);
+
+/**
+ * Appends `what' to the charbuf, which can be a formatted string
+ * processed by `vsnprintf'. If you know beforehand what size you
+ * need to append to the charbuf, use charbuf_append instead.
+ *
+ * The amount of characters written by vsnprintf are returned,
+ * excluding the zero terminator string.
+ */
+int charbuf_appendf(struct charbuf* buf, const char* what, ...);
 
 /**
  * Draws (writes) the charbuf to the screen.
