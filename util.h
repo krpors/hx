@@ -41,6 +41,12 @@ int  hex2bin(const char* s);
 bool get_window_size(int* rows, int* cols);
 
 /**
+ * Returns true when the given char can be successfully parsed as a positive
+ * integer, or return false if otherwise.
+ */
+bool is_pos_num(const char* s);
+
+/**
  * Parses a string to an integer and returns it. In case of errors, the default
  * `def' will be returned. When the `min' > parsed_value > `max', then the
  * default `def' will also be returned.

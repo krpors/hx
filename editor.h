@@ -157,6 +157,15 @@ void editor_replace_byte(struct editor* e, char x);
 void editor_scroll(struct editor* e, int units);
 
 /**
+ * Scrolls the editor to a particular given offset. The given offset
+ * can be given any value, the function will limit it to the upper and
+ * lower bounds of what can be displayed.
+ *
+ * The cursor will be centered on the screen.
+ */
+void editor_scroll_to_offset(struct editor* e, int offset);
+
+/**
  * Sets editor to mode to one of the modes defined in the enum.
  */
 void editor_setmode(struct editor *e, enum editor_mode mode);

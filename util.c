@@ -5,6 +5,7 @@
  */
 #include "util.h"
 
+#include <ctype.h>
 #include <errno.h>
 #include <inttypes.h>
 #include <stdbool.h>
@@ -42,6 +43,16 @@ int hex2bin(const char* s) {
 		ret = n + ret*16;
 	}
 	return ret;
+}
+
+bool is_pos_num(const char* s) {
+	const char* ptr = s;
+	while(*++ptr) {
+		if (!isdigit(*ptr)) {
+			return false;
+		}
+	}
+	return true;
 }
 
 int str2int(const char* s, int min, int max, int def) {

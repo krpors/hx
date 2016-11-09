@@ -254,6 +254,29 @@ void editor_scroll(struct editor* e, int units) {
 	}
 }
 
+void editor_scroll_to_offset(struct editor* e, int offset) {
+	// Determine what 'line' to set, by dividing the offset to
+	// be displayed by the number of octets per line. The line
+	// is subtracted with the number of rows in the screen, divided
+	// by 2 so the cursor can be centered on the screen.
+	e->line = offset / e->octets_per_line - (e->screen_rows / 2);
+
+	// TODO: editor_scroll uses this same limit. Probably better to refactor
+	// this part on way or another to prevent dupe.
+	int upper_limit = e->content_length / e->octets_per_line - (e->screen_rows - 2);
+	if (e->line >= upper_limit) {
+		e->line = upper_limit;
+	}
+
+	if (e->line <= 0) {
+		e->line = 0;
+	}
+
+	editor_cursor_at_offset(e, offset, &(e->cursor_x), &(e->cursor_y));
+
+	editor_statusmessage(e, STATUS_INFO, "Positioned to offset %09x (%d)", offset, offset);
+}
+
 void editor_setmode(struct editor* e, enum editor_mode mode) {
 	e->mode = mode;
 	switch (e->mode) {
@@ -557,8 +580,20 @@ void editor_process_cmdinput(struct editor* e, char c) {
 	// the command, and possibly set a statusmessage.
 	if (c == KEY_ENTER) {
 		editor_setmode(e, MODE_NORMAL);
-		fprintf(stderr, "what: %s\n", e->cmdbuffer);
-		editor_statusmessage(e, STATUS_ERROR, "Command not found: %s", e->cmdbuffer);
+
+		do {
+			// if number then go to offset
+			bool b = is_pos_num(e->cmdbuffer);
+			if (b) {
+				int offset = str2int(e->cmdbuffer, 0, e->content_length, e->content_length - 1);
+				editor_scroll_to_offset(e, offset);
+				break;
+			}
+
+			editor_statusmessage(e, STATUS_ERROR, "Command not found: %s", e->cmdbuffer);
+			break;
+		} while(true);
+
 		e->cmdbuffer_index = 0;
 		memset(e->cmdbuffer, 0, sizeof(e->cmdbuffer));
 		return;
