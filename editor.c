@@ -286,6 +286,7 @@ void editor_setmode(struct editor* e, enum editor_mode mode) {
 	e->mode = mode;
 	switch (e->mode) {
 	case MODE_NORMAL:  editor_statusmessage(e, STATUS_INFO, ""); break;
+	case MODE_APPEND:  editor_statusmessage(e, STATUS_INFO, "-- APPEND -- "); break;
 	case MODE_INSERT:  editor_statusmessage(e, STATUS_INFO, "-- INSERT --"); break;
 	case MODE_REPLACE: editor_statusmessage(e, STATUS_INFO, "-- REPLACE --"); break;
 	case MODE_COMMAND: break;
@@ -500,7 +501,7 @@ void editor_refresh_screen(struct editor* e) {
 	charbuf_append(b, "\x1b[?25l", 6);
 	charbuf_append(b, "\x1b[H", 3); // move the cursor top left
 
-	if (e->mode == MODE_REPLACE || e->mode == MODE_NORMAL || e->mode == MODE_INSERT) {
+	if (e->mode & (MODE_REPLACE | MODE_NORMAL | MODE_APPEND | MODE_INSERT)) {
 		editor_render_contents(e, b);
 		editor_render_status(e, b);
 
@@ -515,7 +516,7 @@ void editor_refresh_screen(struct editor* e) {
 		int spaces = curx / (e->grouping * 2); // determine spaces to add due to grouping.
 		int cruft = curx + spaces + 12; // 12 = the size of the address + ": "
 		charbuf_appendf(b, "\x1b[%d;%dH", e->cursor_y, cruft);
-	} else if (e->mode == MODE_COMMAND) {
+	} else if (e->mode & MODE_COMMAND) {
 		// When in command mode, handle rendering different. For instance,
 		// the cursor is placed at the bottom. Ruler is not required.
 		// After moving the cursor, clear the entire line ([2K).
@@ -530,12 +531,15 @@ void editor_refresh_screen(struct editor* e) {
 }
 
 
-void editor_insert(struct editor* e, char x) {
+void editor_insert_byte(struct editor* e, char x, bool after) {
 	// We are inserting a single character. Reallocate memory to contain
 	// this extra byte.
 	e->contents = realloc(e->contents, e->content_length + 1);
 
 	int offset = editor_offset_at_cursor(e);
+	if (after) {
+		offset++;
+	}
 	//          v
 	// |t|e|s|t|b|y|t|e|s|...
 	// |t|e|s|t|_|b|y|t|e|s|...
@@ -558,9 +562,10 @@ void editor_replace_byte(struct editor* e, char x) {
 }
 
 
-void editor_process_cmdinput(struct editor* e, char c) {
+void editor_process_cmdinput(struct editor* e) {
 	// if we hit enter, set the mode to normal mode, execute
 	// the command, and possibly set a statusmessage.
+	int c = read_key();
 	if (c == KEY_ENTER) {
 		editor_setmode(e, MODE_NORMAL);
 
@@ -614,33 +619,74 @@ void editor_process_cmdinput(struct editor* e, char c) {
 	e->cmdbuffer[e->cmdbuffer_index++] = c;
 }
 
-/**
- * TODO: I'm not really happy with this implementation. It uses an already
- * read key (next), then puts the result in `out', and returns 0 when OK.
- * Something is wrong here... I think it's because the idea is that we're
- * constantly looping editor_process_keypress and editor_refresh_screen().
- */
-int editor_read_hex_input(struct editor* e, char next, char* out) {
-	char hexstr[2 + 1];
-	// Check if the input character was a valid hex value. If not, return prematurely.
-	if (!isxdigit(next)) {
-		editor_statusmessage(e, STATUS_ERROR, "Error: '%c' (%02x) is not valid hex", next, next);
-		return -1;
-	}
-	hexstr[0] = next;
-	next = read_key();
-	if (!isxdigit(next)) {
-		editor_statusmessage(e, STATUS_ERROR, "Error: '%c' (%02x) is not valid hex", next, next);
-		return -1;
-	}
-	hexstr[1] = next;
+int editor_read_hex_input(struct editor* e, char* out) {
+	// Declared static to avoid unnecessary 'global' variable state. We're
+	// only interested in this data in this function anyway. For now.
+	static int  hexstr_idx = 0; // what index in hexstr are we updating?
+	static char hexstr[2 + 1];  // the actual string updated with the keypress.
 
-	*out = hex2bin(hexstr);
-	return 0;
+	int next = read_key();
+
+	if (next == KEY_ESC) {
+		// escape the current mode to NORMAL, reset the hexstr and index so
+		// we can start afresh with the next REPLACE mode.
+		editor_setmode(e, MODE_NORMAL);
+		memset(hexstr, 0, 3);
+		hexstr_idx = 0;
+		return -1;
+	}
+
+	// Check if the input character was a valid hex value. If not, return prematurely.
+	if (!isprint(next)) {
+		editor_statusmessage(e, STATUS_ERROR, "Error: unprintable character (%02x)", next);
+		return -1;
+	}
+	if (!isxdigit(next)) {
+		editor_statusmessage(e, STATUS_ERROR, "Error: '%c' (%02x) is not valid hex", next, next);
+		return -1;
+	}
+
+	// hexstr[0] will contain the first typed character
+	// hexstr[1] contains the second.
+	hexstr[hexstr_idx++] = next;
+
+	if (hexstr_idx >= 2) {
+		// Parse the hexstr to an actual char. Example: '65' will return 'e'.
+		*out = hex2bin(hexstr);
+		memset(hexstr, 0, 3);
+		hexstr_idx = 0;
+		return 0;
+	}
+
+	return -1;
 }
 
 
 void editor_process_keypress(struct editor* e) {
+	if (e->mode & (MODE_INSERT | MODE_APPEND)) {
+		char out = 0;
+		if (editor_read_hex_input(e, &out) != -1) {
+			editor_insert_byte(e, out, e->mode & MODE_APPEND);
+		}
+		return;
+	}
+
+	if (e->mode & MODE_REPLACE) {
+		char out = 0;
+		if (editor_read_hex_input(e, &out) != -1) {
+			editor_replace_byte(e, out);
+		}
+		return;
+	}
+
+	if (e->mode & MODE_COMMAND) {
+		// Input manual, typed commands.
+		editor_process_cmdinput(e);
+		return;
+	}
+
+
+	// When in normal mode, start reading 'raw' keys.
 	int c = read_key();
 	if (c == -1) {
 		return;
@@ -654,7 +700,7 @@ void editor_process_keypress(struct editor* e) {
 	}
 
 	// Handle commands when in normal mode.
-	if (e->mode == MODE_NORMAL) {
+	if (e->mode & MODE_NORMAL) {
 		switch (c) {
 		// cursor movement:
 		case KEY_UP:
@@ -671,6 +717,7 @@ void editor_process_keypress(struct editor* e) {
 		case KEY_DEL:
 		case 'x': editor_delete_char_at_cursor(e); break;
 
+		case 'a': editor_setmode(e, MODE_APPEND); return;
 		case 'i': editor_setmode(e, MODE_INSERT); return;
 		case 'r': editor_setmode(e, MODE_REPLACE); return;
 		case ':': editor_setmode(e, MODE_COMMAND); return;
@@ -698,19 +745,6 @@ void editor_process_keypress(struct editor* e) {
 		case KEY_PAGEUP:   editor_scroll(e, -(e->screen_rows) + 2); return;
 		case KEY_PAGEDOWN: editor_scroll(e, e->screen_rows - 2); return;
 		}
-	}
-
-	if (e->mode == MODE_INSERT) {
-		// Insert character after the cursor.
-		editor_insert(e, (char) c);
-	} else if (e->mode == MODE_REPLACE) {
-		char out;
-		if (editor_read_hex_input(e, c, &out) != -1) {
-			editor_replace_byte(e, out);
-		}
-	} else if (e->mode == MODE_COMMAND) {
-		// Input manual, typed commands.
-		editor_process_cmdinput(e, c);
 	}
 }
 

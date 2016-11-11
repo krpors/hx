@@ -15,10 +15,11 @@
  * Mode the editor can be in.
  */
 enum editor_mode {
-	MODE_NORMAL,  // normal mode i.e. for navigating, commands.
-	MODE_INSERT,  // insert values at cursor position.
-	MODE_REPLACE, // replace values at cursor position.
-	MODE_COMMAND, // command input mode.
+	MODE_APPEND  = 0x01, // append value after the current cursor position.
+	MODE_NORMAL  = 0x02, // normal mode i.e. for navigating, commands.
+	MODE_INSERT  = 0x04, // insert values at cursor position.
+	MODE_REPLACE = 0x08, // replace values at cursor position.
+	MODE_COMMAND = 0x10, // command input mode.
 };
 
 /**
@@ -80,6 +81,12 @@ void editor_free(struct editor* e);
 void editor_increment_byte(struct editor* e, int amount);
 
 /**
+ * Inserts the character byte at the current offset, or after the current
+ * offset if `after' is set to true.
+ */
+void editor_insert_byte(struct editor* e, char x, bool after);
+
+/**
  * Moves the cursor. The terminal cursor positions are all 1-based, so we
  * take that into account. When we scroll past boundaries (left, right, up
  * and down) we react accordingly. Note that the cursor_x/y are also 1-based,
@@ -102,9 +109,9 @@ void editor_openfile(struct editor* e, const char* filename);
 
 /**
  * Processes a manual command input when the editor mode is set
- * to MODE_COMMAND. `c' is the character read by read_key().
+ * to MODE_COMMAND.
  */
-void editor_process_cmdinput(struct editor* e, char c);
+void editor_process_cmdinput(struct editor* e);
 
 /**
  * Processes a keypress accordingly.
@@ -112,14 +119,11 @@ void editor_process_cmdinput(struct editor* e, char c);
 void editor_process_keypress(struct editor* e);
 
 /**
- * Reads two characters from the keyboard, attempts to parse them as a valid
- * hex value and returns it as a char. For example, first char read could be
- * 'F', second '3'. The two inputs are then returned as the char 0xf3. Will
- * return -1 if the input is invalid hexadecimal, and updates the editor's
- * status bar with an error. `c' is the initial character being read by
- * read_key(), since we're looping the editor_process_keypress().
+ * This function is looped while in REPLACE mode until two valid hex characters
+ * are read from the user. The result is placed in the char pointed to by `out'.
+ * `output' is therefore not a string, but a pointer to a single char!
  */
-int editor_read_hex_input(struct editor* e, char initial, char* output);
+int editor_read_hex_input(struct editor* e, char* output);
 
 /**
  * Renders the given ASCII string, `asc' to the buffer `b'. The `rownum'
