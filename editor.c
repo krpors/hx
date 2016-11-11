@@ -500,7 +500,7 @@ void editor_refresh_screen(struct editor* e) {
 	charbuf_append(b, "\x1b[?25l", 6);
 	charbuf_append(b, "\x1b[H", 3); // move the cursor top left
 
-	if (e->mode == MODE_REPLACE || e->mode == MODE_NORMAL) {
+	if (e->mode == MODE_REPLACE || e->mode == MODE_NORMAL || e->mode == MODE_INSERT) {
 		editor_render_contents(e, b);
 		editor_render_status(e, b);
 
@@ -534,10 +534,19 @@ void editor_insert(struct editor* e, char x) {
 	// We are inserting a single character. Reallocate memory to contain
 	// this extra byte.
 	e->contents = realloc(e->contents, e->content_length + 1);
-	// Set the last allocated index to the character x.
-	e->contents[e->content_length] = x;
+
+	int offset = editor_offset_at_cursor(e);
+	//          v
+	// |t|e|s|t|b|y|t|e|s|...
+	// |t|e|s|t|_|b|y|t|e|s|...
+	memmove(e->contents + offset + 1, e->contents + offset, e->content_length - offset);
+
+	e->contents[offset] = x;
+
 	// Increase the content length since we inserted a character.
 	e->content_length++;
+
+	editor_move_cursor(e, KEY_RIGHT, 1);
 }
 
 
@@ -545,6 +554,7 @@ void editor_replace_byte(struct editor* e, char x) {
 	int offset = editor_offset_at_cursor(e);
 	e->contents[offset] = x;
 	editor_move_cursor(e, KEY_RIGHT, 1);
+	editor_statusmessage(e, STATUS_INFO, "Replaced byte at offset %09x with %02x", offset, (unsigned char) x);
 }
 
 
@@ -565,15 +575,13 @@ void editor_process_cmdinput(struct editor* e, char c) {
 
 			// Command: go to hex offset
 			if (e->cmdbuffer[0] == '0' && e->cmdbuffer[1] == 'x') {
-				char* ptr = strchr(e->cmdbuffer, 'x');
-				ptr++; // increase pointer, to prevent the 'x' to be included
-				int offset = hex2int(ptr);
+				char* ptr = &e->cmdbuffer[2];
 				if (!is_hex(ptr)) {
 					editor_statusmessage(e, STATUS_ERROR, "Error: %s is not valid base 16", ptr);
 					break;
 				}
 
-
+				int offset = hex2int(ptr);
 				editor_scroll_to_offset(e, offset);
 				break;
 			}
@@ -604,6 +612,31 @@ void editor_process_cmdinput(struct editor* e, char c) {
 	}
 
 	e->cmdbuffer[e->cmdbuffer_index++] = c;
+}
+
+/**
+ * TODO: I'm not really happy with this implementation. It uses an already
+ * read key (next), then puts the result in `out', and returns 0 when OK.
+ * Something is wrong here... I think it's because the idea is that we're
+ * constantly looping editor_process_keypress and editor_refresh_screen().
+ */
+int editor_read_hex_input(struct editor* e, char next, char* out) {
+	char hexstr[2 + 1];
+	// Check if the input character was a valid hex value. If not, return prematurely.
+	if (!isxdigit(next)) {
+		editor_statusmessage(e, STATUS_ERROR, "Error: '%c' (%02x) is not valid hex", next, next);
+		return -1;
+	}
+	hexstr[0] = next;
+	next = read_key();
+	if (!isxdigit(next)) {
+		editor_statusmessage(e, STATUS_ERROR, "Error: '%c' (%02x) is not valid hex", next, next);
+		return -1;
+	}
+	hexstr[1] = next;
+
+	*out = hex2bin(hexstr);
+	return 0;
 }
 
 
@@ -669,25 +702,12 @@ void editor_process_keypress(struct editor* e) {
 
 	if (e->mode == MODE_INSERT) {
 		// Insert character after the cursor.
-		//editor_insert(e, (char) c);
+		editor_insert(e, (char) c);
 	} else if (e->mode == MODE_REPLACE) {
-		// Check if the input character was a valid hex value. If not, return prematurely.
-		if (!isxdigit(c)) {
-			editor_statusmessage(e, STATUS_ERROR, "'%c' is not valid hex", c);
-			return;
+		char out;
+		if (editor_read_hex_input(e, c, &out) != -1) {
+			editor_replace_byte(e, out);
 		}
-		int next = read_key();
-		if (!isxdigit(next)) {
-			editor_statusmessage(e, STATUS_ERROR, "'%c' is not valid hex", next);
-			return;
-		}
-
-		int offset = editor_offset_at_cursor(e);
-		char crud[2 + 1];
-		snprintf(crud, sizeof(crud), "%c%c", (char)c, (char)next);
-		char ashex = hex2bin(crud);
-		editor_replace_byte(e, ashex);
-		editor_statusmessage(e, STATUS_INFO, "Replaced byte at offset %09x with %02x", offset, (unsigned char)ashex);
 	} else if (e->mode == MODE_COMMAND) {
 		// Input manual, typed commands.
 		editor_process_cmdinput(e, c);
@@ -702,7 +722,6 @@ struct editor* editor_init() {
 
 	e->octets_per_line = 16;
 	e->grouping = 2;
-	e->hex_line_width = e->octets_per_line * 2 + (e->octets_per_line / 2) - 1;
 
 	e->line = 0;
 	e->cursor_x = 1;

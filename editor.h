@@ -37,29 +37,29 @@ struct editor {
 	int octets_per_line; // Amount of octets (bytes) per line. Ideally multiple of 2.
 	int grouping;        // Amount of bytes per group. Ideally multiple of 2.
 
-	int hex_line_width;  // the width in chars of a hex line, including
-	                     // grouping spaces.
-
 	int line;        // The 'line' in the editor. Used for scrolling.
 	int cursor_x;    // Cursor x pos on the current screen
 	int cursor_y;    // Cursor y pos on the current screen
 	int screen_rows; // amount of screen rows after init
 	int screen_cols; // amount of screen columns after init
 
-	enum editor_mode mode;           // mode the editor is in
-	bool             dirty;          // whether the buffer is modified
-	char*            filename;       // the filename currently open
-	char*            contents;       // the file's contents
-	int              content_length; // length of the contents
+	enum editor_mode mode; // mode the editor is in
+
+	bool  dirty;          // whether the buffer is modified
+	char* filename;       // the filename currently open
+	char* contents;       // the file's contents
+	int   content_length; // length of the contents
 
 	enum status_severity status_severity;     // status severity
 	char                 status_message[120]; // status message
 
-	char cmdbuffer[80];
-	int cmdbuffer_index;
+	char cmdbuffer[80];  // command input buffer.
+	int cmdbuffer_index; // the index of the current typed key shiz.
 };
 
-// editor functions:
+/**
+ * Initializes the editor struct with basic values.
+ */
 struct editor* editor_init();
 
 /**
@@ -110,6 +110,16 @@ void editor_process_cmdinput(struct editor* e, char c);
  * Processes a keypress accordingly.
  */
 void editor_process_keypress(struct editor* e);
+
+/**
+ * Reads two characters from the keyboard, attempts to parse them as a valid
+ * hex value and returns it as a char. For example, first char read could be
+ * 'F', second '3'. The two inputs are then returned as the char 0xf3. Will
+ * return -1 if the input is invalid hexadecimal, and updates the editor's
+ * status bar with an error. `c' is the initial character being read by
+ * read_key(), since we're looping the editor_process_keypress().
+ */
+int editor_read_hex_input(struct editor* e, char initial, char* output);
 
 /**
  * Renders the given ASCII string, `asc' to the buffer `b'. The `rownum'
