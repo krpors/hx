@@ -5,11 +5,21 @@ is somewhat influenced by the [kilo project](https://github.com/antirez/kilo).
 # Compiling and running
 The project does not have a dependency on libraries, not even curses. Like the
 kilo editor, it makes use of ANSI escape sequences. The source can be compiled
-by simply running `make`.
+by simply running `make`, or `make all` to gzip the manpage as well. To install,
+simply run `make install` (as root). The files are currently installed under
+`/usr/bin/` (binary) and `/usr/share/man/man1` (man page). Not really sure yet
+if this is portable across distributions, though.
 
 Running `hx`:
 
-    ./hx filename
+	$ ./hx filename       # open a file
+	$ ./hx -h             # for help
+	$ ./hx -v             # version information
+	$ ./hx -o 32 filename # open file with 32 octets per line
+	$ ./hx -g 8 filename  # open file, set octet grouping to 8
+
+or for some help:
+
 
 Keys which can be used:
 
@@ -21,19 +31,20 @@ Keys which can be used:
 	b       : Skip one group of bytes to the left.
 	gg      : Move to start of file.
 	G       : Move to end of file.
-	x       : Delete byte at cursor position.
-	Delete  : Delete byte at cursor position.
-	r       : Replace mode. Type two valid hex chars to insert that byte
-	          at the current offset.
-	i       : Insert mode (not functional yet).
+	x / DEL : Delete byte at cursor position.
+
+	a       : Append mode. Appends a byte after the current cursor position.
+	i       : Insert mode. Inserts a byte at the current cursor position.
+	r       : Replace mode. Replaces the byte at the current cursor position.
+	:       : Command mode. Commands can be typed and executed (see below).
+	ESC     : Return to normal mode.
+
 	]       : Increment byte at cursor position with 1.
 	[       : Decrement byte at cursor position with 1.
-	ESC     : Normal mode.
+
 	End     : Move cursor to end of the offset line.
 	Home    : Move cursor to the beginning of the offset line.
-	:       : Enable command mode.
 
-Subject to change however.
 
 # Command mode
 

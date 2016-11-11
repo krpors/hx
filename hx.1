@@ -79,6 +79,12 @@ Specifying a grouping of 2 bytes:
 .Sh KEY BINDINGS
 To navigate in the editor, the following key bindings are made available:
 .Pp
+
+.Bl -tag -width Ds
+.It Fl g Ar grouping
+specifies the grouping of bytes.
+.El
+
 .Bl -item -compact -offset 2n
 .It
 CTRL+Q:    : quit immediately without saving.
@@ -97,11 +103,13 @@ k / up     : move cursor one position down (= num_octets_per_line).
 .It
 [          : decrement the byte at the cursor position with 1.
 .It
-x / delete : delete byte at current cursor position.
+x / DEL    : delete byte at current cursor position.
+.It
+a          : enable APPEND mode.
+.It
+i          : enable INSERT mode.
 .It
 r          : enable REPLACE mode.
-.It
-i          : enable INSERT mode (not functional yet).
 .It
 ESC        : enable NORMAL mode.
 .It
@@ -110,10 +118,26 @@ ESC        : enable NORMAL mode.
 for more information.
 .El
 
-.Sh COMMAND MODE
+.Sh MODES
 .Nm
-allows the input of some manual commands when in 'command mode'. This can be
-triggerd by typing the colon (
+knows of five several modes which can be used.
+.Ss NORMAL
+Normal-mode is the mode where regular keys can be used to switch modes, navigate
+through the buffer, etc. Hit ESC at any time to trigger normal-mode.
+.Ss APPEND
+In append-mode, the editor appends a byte value one position after the current
+selected offset. To go into append mode, type 'a' when in normal-mode. Two valid
+hexadecimal characters need to be typed to append that byte value. For instance,
+type '6' followed by '5' to append the hex value '0x65' (which is ASCII 'e').
+.Ss INSERT
+In insert-mode, the editor inserts a byte value at the current offset. Use 'i'
+when in normal-mode to switch to insert-mode.
+.Ss REPLACE
+In replace-mode, the editor replaces the current byte at the current offset with
+a byte of choice. Use 'r' when in normal-mode to switch to replace-mode.
+.Ss COMMAND
+In command-mode, manual commands can be entered This can be triggered by typing 
+the colon (
 .Sy :
 ) character. The cursor will move to the bottom where there's space to type
 a command. Current implemented commands are:
