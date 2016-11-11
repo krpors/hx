@@ -2,6 +2,10 @@
 Attempt to create a hex editor using plain C + POSIX libs. The project's code
 is somewhat influenced by the [kilo project](https://github.com/antirez/kilo).
 
+For an idea how it looks (or should look... :)) :
+
+![hx](http://i.imgur.com/EjQ5TeI.png)
+
 # Compiling and running
 The project does not have a dependency on libraries, not even curses. Like the
 kilo editor, it makes use of ANSI escape sequences. The source can be compiled
