@@ -18,9 +18,6 @@ Running `hx`:
 	$ ./hx -o 32 filename # open file with 32 octets per line
 	$ ./hx -g 8 filename  # open file, set octet grouping to 8
 
-or for some help:
-
-
 Keys which can be used:
 
     CTRL+Q  : Quit immediately without saving.
