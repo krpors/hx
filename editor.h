@@ -20,6 +20,7 @@ enum editor_mode {
 	MODE_INSERT  = 0x04, // insert values at cursor position.
 	MODE_REPLACE = 0x08, // replace values at cursor position.
 	MODE_COMMAND = 0x10, // command input mode.
+	MODE_SEARCH  = 0x20, // search mode.
 };
 
 /**
@@ -30,6 +31,8 @@ enum status_severity {
 	STATUS_WARNING, // appear as yellow bg, black fg
 	STATUS_ERROR,   // appear as red bg, white fg
 };
+
+#define INPUT_BUF_SIZE 80
 
 /**
  * This struct contains internal information of the state of the editor.
@@ -54,8 +57,9 @@ struct editor {
 	enum status_severity status_severity;     // status severity
 	char                 status_message[120]; // status message
 
-	char cmdbuffer[80];  // command input buffer.
-	int cmdbuffer_index; // the index of the current typed key shiz.
+	char inputbuffer[INPUT_BUF_SIZE]; // input buffer for commands
+	                                   // or search strings etc.
+	int inputbuffer_index; // the index of the current typed key shiz.
 };
 
 /**
@@ -111,7 +115,7 @@ void editor_openfile(struct editor* e, const char* filename);
  * Processes a manual command input when the editor mode is set
  * to MODE_COMMAND.
  */
-void editor_process_cmdinput(struct editor* e);
+void editor_process_command(struct editor* e, const char* cmd);
 
 /**
  * Processes a keypress accordingly.
@@ -124,6 +128,14 @@ void editor_process_keypress(struct editor* e);
  * `output' is therefore not a string, but a pointer to a single char!
  */
 int editor_read_hex_input(struct editor* e, char* output);
+
+/**
+ * 'Generic' function to read an input string (such as a command or
+ * a search string). An internal buffer 'inputbuffer' is filled, purely
+ * for displaying purposes. The actual result will be placed in the
+ * `dst' string.
+ */
+int editor_read_string(struct editor* e, char* dst, int len);
 
 /**
  * Renders the given ASCII string, `asc' to the buffer `b'. The `rownum'

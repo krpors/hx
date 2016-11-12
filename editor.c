@@ -290,6 +290,7 @@ void editor_setmode(struct editor* e, enum editor_mode mode) {
 	case MODE_INSERT:  editor_statusmessage(e, STATUS_INFO, "-- INSERT --"); break;
 	case MODE_REPLACE: editor_statusmessage(e, STATUS_INFO, "-- REPLACE --"); break;
 	case MODE_COMMAND: break;
+	case MODE_SEARCH:  break;
 	}
 }
 
@@ -329,9 +330,6 @@ void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct c
 		charbuf_append(b, "\x1b[1;37m", 7);
 		charbuf_append(b, asc, strlen(asc));
 	}
-}
-
-void editor_render_cmd(struct editor* e) {
 }
 
 
@@ -521,7 +519,10 @@ void editor_refresh_screen(struct editor* e) {
 		// the cursor is placed at the bottom. Ruler is not required.
 		// After moving the cursor, clear the entire line ([2K).
 		charbuf_appendf(b, "\x1b[0m\x1b[%d;1H\x1b[2K:", e->screen_rows);
-		charbuf_append(b, e->cmdbuffer, e->cmdbuffer_index);
+		charbuf_append(b, e->inputbuffer, e->inputbuffer_index);
+	} else if (e->mode & MODE_SEARCH) {
+		charbuf_appendf(b, "\x1b[0m\x1b[%d;1H\x1b[2K/", e->screen_rows);
+		charbuf_append(b, e->inputbuffer, e->inputbuffer_index);
 	}
 
 	charbuf_append(b, "\x1b[?25h", 6);
@@ -562,61 +563,32 @@ void editor_replace_byte(struct editor* e, char x) {
 }
 
 
-void editor_process_cmdinput(struct editor* e) {
-	// if we hit enter, set the mode to normal mode, execute
-	// the command, and possibly set a statusmessage.
-	int c = read_key();
-	if (c == KEY_ENTER) {
-		editor_setmode(e, MODE_NORMAL);
-
-		do {
-			// Command: go to base 10 offset
-			bool b = is_pos_num(e->cmdbuffer);
-			if (b) {
-				int offset = str2int(e->cmdbuffer, 0, e->content_length, e->content_length - 1);
-				editor_scroll_to_offset(e, offset);
-				break;
-			}
-
-			// Command: go to hex offset
-			if (e->cmdbuffer[0] == '0' && e->cmdbuffer[1] == 'x') {
-				char* ptr = &e->cmdbuffer[2];
-				if (!is_hex(ptr)) {
-					editor_statusmessage(e, STATUS_ERROR, "Error: %s is not valid base 16", ptr);
-					break;
-				}
-
-				int offset = hex2int(ptr);
-				editor_scroll_to_offset(e, offset);
-				break;
-			}
-
-			editor_statusmessage(e, STATUS_ERROR, "Command not found: %s", e->cmdbuffer);
+void editor_process_command(struct editor* e, const char* cmd) {
+	do {
+		// Command: go to base 10 offset
+		bool b = is_pos_num(cmd);
+		if (b) {
+			int offset = str2int(cmd, 0, e->content_length, e->content_length - 1);
+			editor_scroll_to_offset(e, offset);
 			break;
-		} while(false);
+		}
 
-		e->cmdbuffer_index = 0;
-		memset(e->cmdbuffer, 0, sizeof(e->cmdbuffer));
-		return;
-	}
+		// Command: go to hex offset
+		if (cmd[0] == '0' && cmd[1] == 'x') {
+			const char* ptr = &cmd[2];
+			if (!is_hex(ptr)) {
+				editor_statusmessage(e, STATUS_ERROR, "Error: %s is not valid base 16", ptr);
+				break;
+			}
 
-	// Safety guard. Our cmdbuffer size is limited to 180 chars, so stop incrementing
-	// our buffer index after this maximum.
-	if (e->cmdbuffer_index >= sizeof(e->cmdbuffer)) {
-		return;
-	}
+			int offset = hex2int(ptr);
+			editor_scroll_to_offset(e, offset);
+			break;
+		}
 
-	if (c == KEY_BACKSPACE && e->cmdbuffer_index > 0) {
-		e->cmdbuffer[e->cmdbuffer_index] = '\0';
-		e->cmdbuffer_index--;
-	}
-
-	// Only act on printable characters.
-	if (!isprint(c)) {
-		return;
-	}
-
-	e->cmdbuffer[e->cmdbuffer_index++] = c;
+		editor_statusmessage(e, STATUS_ERROR, "Command not found: %s", cmd);
+		break;
+	} while(false);
 }
 
 int editor_read_hex_input(struct editor* e, char* out) {
@@ -662,6 +634,50 @@ int editor_read_hex_input(struct editor* e, char* out) {
 }
 
 
+int editor_read_string(struct editor* e, char* dst, int len) {
+	// if we hit enter, set the mode to normal mode, execute
+	// the command, and possibly set a statusmessage.
+	int c = read_key();
+	if (c == KEY_ENTER || c == KEY_ESC) {
+		editor_setmode(e, MODE_NORMAL);
+		// copy the 'temp' inputbuffer to the dst.
+		strncpy(dst, e->inputbuffer, len);
+		// After copying, reset the index and the inputbuffer
+		e->inputbuffer_index = 0;
+		memset(e->inputbuffer, 0, sizeof(e->inputbuffer));
+		return c;
+	}
+
+	// backspace characters by setting characters to 0
+	if (c == KEY_BACKSPACE && e->inputbuffer_index > 0) {
+		e->inputbuffer_index--;
+		e->inputbuffer[e->inputbuffer_index] = '\0';
+		return c;
+	}
+
+	// Safety guard. Our inputbuffer size is limited so stop
+	// incrementing our buffer index after this maximum.
+	if (e->inputbuffer_index >= sizeof(e->inputbuffer)) {
+		return c;
+	}
+
+	// if the buffer is empty (no command), and we're
+	// still backspacing, return to normal mode.
+	if (c == KEY_BACKSPACE && e->inputbuffer_index == 0) {
+		editor_setmode(e, MODE_NORMAL);
+		return c;
+	}
+
+	// Only act on printable characters.
+	if (!isprint(c)) {
+		return c;
+	}
+
+	e->inputbuffer[e->inputbuffer_index++] = c;
+	return c;
+}
+
+
 void editor_process_keypress(struct editor* e) {
 	if (e->mode & (MODE_INSERT | MODE_APPEND)) {
 		char out = 0;
@@ -681,7 +697,11 @@ void editor_process_keypress(struct editor* e) {
 
 	if (e->mode & MODE_COMMAND) {
 		// Input manual, typed commands.
-		editor_process_cmdinput(e);
+		char cmd[INPUT_BUF_SIZE];
+		int c = editor_read_string(e, cmd, INPUT_BUF_SIZE);
+		if (c == KEY_ENTER && strlen(cmd) > 0) {
+			editor_process_command(e, cmd);
+		}
 		return;
 	}
 
@@ -717,10 +737,11 @@ void editor_process_keypress(struct editor* e) {
 		case KEY_DEL:
 		case 'x': editor_delete_char_at_cursor(e); break;
 
-		case 'a': editor_setmode(e, MODE_APPEND); return;
-		case 'i': editor_setmode(e, MODE_INSERT); return;
+		case 'a': editor_setmode(e, MODE_APPEND);  return;
+		case 'i': editor_setmode(e, MODE_INSERT);  return;
 		case 'r': editor_setmode(e, MODE_REPLACE); return;
 		case ':': editor_setmode(e, MODE_COMMAND); return;
+		case '/': editor_setmode(e, MODE_SEARCH);  return;
 
 		// move `grouping` amount back or forward:
 		case 'b': editor_move_cursor(e, KEY_LEFT, e->grouping); break;
@@ -768,8 +789,8 @@ struct editor* editor_init() {
 
 	e->mode = MODE_NORMAL;
 
-	memset(e->cmdbuffer, 0, sizeof(e->cmdbuffer));
-	e->cmdbuffer_index = 0;
+	memset(e->inputbuffer, 0, sizeof(e->inputbuffer));
+	e->inputbuffer_index = 0;
 
 	get_window_size(&(e->screen_rows), &(e->screen_cols));
 
