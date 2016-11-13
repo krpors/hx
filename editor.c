@@ -330,6 +330,7 @@ void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct c
 		charbuf_append(b, "\x1b[1;37m", 7);
 		charbuf_append(b, asc, strlen(asc));
 	}
+	charbuf_append(b, "\x1b[0m", 4);
 }
 
 

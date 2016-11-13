@@ -39,6 +39,9 @@ void charbuf_free(struct charbuf* buf) {
 void charbuf_append(struct charbuf* buf, const char* what, size_t len) {
 	assert(what != NULL);
 
+	// TODO: optimize the realloc by doubling the amount instead
+	// of adding len+len everytime.
+
 	// reallocate the contents with more memory, to hold 'what'.
 	char* new = realloc(buf->contents, buf->len + len);
 	if (new == NULL) {
