@@ -19,7 +19,8 @@ static const int CHARBUF_APPENDF_SIZE = 1024;
  */
 struct charbuf {
 	char* contents;
-	int len;
+	int len;        // actual length of what's in the buffer
+	int cap;        // capacity
 };
 
 /**

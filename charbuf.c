@@ -16,6 +16,7 @@ struct charbuf* charbuf_create() {
 	if (b) {
 		b->contents = NULL;
 		b->len = 0;
+		b->cap = 0;
 		return b;
 	} else {
 		perror("Unable to allocate size for struct charbuf");
@@ -39,19 +40,21 @@ void charbuf_free(struct charbuf* buf) {
 void charbuf_append(struct charbuf* buf, const char* what, size_t len) {
 	assert(what != NULL);
 
-	// TODO: optimize the realloc by doubling the amount instead
-	// of adding len+len everytime.
-
-	// reallocate the contents with more memory, to hold 'what'.
-	char* new = realloc(buf->contents, buf->len + len);
-	if (new == NULL) {
-		perror("Unable to realloc charbuf");
-		exit(1);
+	// Prevent reallocing a lot by using some sort of geometric progression
+	// by increasing the cap with len, then doubling it.
+	if (buf->len + len >= buf->cap) {
+		buf->cap += len;
+		buf->cap *= 2;
+		// reallocate with twice the capacity
+		buf->contents = realloc(buf->contents, buf->cap);
+		if (buf->contents == NULL) {
+			perror("Unable to realloc charbuf");
+			exit(1);
+		}
 	}
 
 	// copy 'what' to the target memory
-	memcpy(new + buf->len, what, len);
-	buf->contents = new;
+	memcpy(buf->contents + buf->len, what, len);
 	buf->len += len;
 }
 
