@@ -24,6 +24,14 @@ enum editor_mode {
 };
 
 /**
+ * Search directions.
+ */
+enum search_direction {
+	SEARCH_FORWARD,
+	SEARCH_BACKWARD,
+};
+
+/**
  * Current status severity.
  */
 enum status_severity {
@@ -60,6 +68,8 @@ struct editor {
 	char inputbuffer[INPUT_BUF_SIZE]; // input buffer for commands
 	                                   // or search strings etc.
 	int inputbuffer_index; // the index of the current typed key shiz.
+
+	char searchstr[INPUT_BUF_SIZE]; // the current search string or NULL if none.
 };
 
 /**
@@ -116,6 +126,11 @@ void editor_openfile(struct editor* e, const char* filename);
  * to MODE_COMMAND.
  */
 void editor_process_command(struct editor* e, const char* cmd);
+
+/**
+ * Processes a search string.
+ */
+void editor_process_search(struct editor* e, const char* str, enum search_direction dir);
 
 /**
  * Processes a keypress accordingly.

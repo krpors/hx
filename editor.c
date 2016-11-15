@@ -592,6 +592,48 @@ void editor_process_command(struct editor* e, const char* cmd) {
 	} while(false);
 }
 
+void editor_process_search(struct editor* e, const char* str, enum search_direction dir) {
+	if (str[0] == '0' && str[1] == 'x') {
+		// search hex value in e->contents
+		return;
+	}
+
+	// Empty search string, reset the searchstr to an empty one and
+	// stops searching anything.
+	if (strncmp(str, "", INPUT_BUF_SIZE) == 0) {
+		strncpy(e->searchstr, str, INPUT_BUF_SIZE);
+		return;
+	}
+
+	// new search query, update searchstr.
+	if (!strncmp(str, e->searchstr, INPUT_BUF_SIZE) == 0) {
+		strncpy(e->searchstr, str, INPUT_BUF_SIZE);
+	}
+
+	int current_offset = editor_offset_at_cursor(e);
+
+	if (dir == SEARCH_FORWARD) {
+		current_offset++;
+		for (; current_offset < e->content_length; current_offset++) {
+			if (memcmp(e->contents + current_offset, str, strlen(str)) == 0) {
+				editor_scroll_to_offset(e, current_offset);
+				return;
+			}
+		}
+	} else if (dir == SEARCH_BACKWARD) {
+		current_offset--;
+		for (; current_offset >= 0; current_offset--) {
+			if (memcmp(e->contents + current_offset, str, strlen(str)) == 0) {
+				editor_scroll_to_offset(e, current_offset);
+				current_offset--;
+				return;
+			}
+		}
+	}
+
+	editor_statusmessage(e, STATUS_WARNING, "String not found: '%s'", str);
+}
+
 int editor_read_hex_input(struct editor* e, char* out) {
 	// Declared static to avoid unnecessary 'global' variable state. We're
 	// only interested in this data in this function anyway. For now.
@@ -706,6 +748,15 @@ void editor_process_keypress(struct editor* e) {
 		return;
 	}
 
+	if (e->mode & MODE_SEARCH) {
+		char search[INPUT_BUF_SIZE];
+		int c = editor_read_string(e, search, INPUT_BUF_SIZE);
+		if (c == KEY_ENTER && strlen(search) > 0) {
+			editor_process_search(e, search, SEARCH_FORWARD);
+		}
+		return;
+	}
+
 
 	// When in normal mode, start reading 'raw' keys.
 	int c = read_key();
@@ -737,6 +788,8 @@ void editor_process_keypress(struct editor* e) {
 		case '[': editor_increment_byte(e, -1); break;
 		case KEY_DEL:
 		case 'x': editor_delete_char_at_cursor(e); break;
+		case 'n': editor_process_search(e, e->searchstr, SEARCH_FORWARD); break;
+		case 'N': editor_process_search(e, e->searchstr, SEARCH_BACKWARD); break;
 
 		case 'a': editor_setmode(e, MODE_APPEND);  return;
 		case 'i': editor_setmode(e, MODE_INSERT);  return;
@@ -792,6 +845,8 @@ struct editor* editor_init() {
 
 	memset(e->inputbuffer, 0, sizeof(e->inputbuffer));
 	e->inputbuffer_index = 0;
+
+	memset(e->searchstr, 0, sizeof(e->searchstr));
 
 	get_window_size(&(e->screen_rows), &(e->screen_cols));
 

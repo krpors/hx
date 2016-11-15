@@ -97,6 +97,7 @@ static void handle_term_resize(int sig) {
 	editor_refresh_screen(g_ec);
 }
 
+
 int main(int argc, char* argv[]) {
 	char* file = NULL;
 	int octets_per_line = 16;
