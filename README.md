@@ -33,6 +33,9 @@ Keys which can be used:
 	gg      : Move to start of file.
 	G       : Move to end of file.
 	x / DEL : Delete byte at cursor position.
+	/       : Start search input.
+	n       : Search for next occurrence.
+	N       : Search for previous occurrence.
 
 	a       : Append mode. Appends a byte after the current cursor position.
 	i       : Insert mode. Inserts a byte at the current cursor position.
