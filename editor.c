@@ -168,6 +168,7 @@ void editor_writefile(struct editor* e) {
 	}
 
 	editor_statusmessage(e, STATUS_INFO, "\"%s\", %d bytes written", e->filename, e->content_length);
+	e->dirty = false;
 
 	fclose(fp);
 }
@@ -198,6 +199,7 @@ void editor_delete_char_at_cursor(struct editor* e) {
 	memmove(e->contents + offset, e->contents + offset + 1 , e->content_length - offset - 1);
 	e->contents = realloc(e->contents, e->content_length - 1);
 	e->content_length--;
+	e->dirty = true;
 
 	// if the deleted offset was the maximum offset, move the cursor to
 	// the left.
@@ -553,6 +555,8 @@ void editor_insert_byte(struct editor* e, char x, bool after) {
 	e->content_length++;
 
 	editor_move_cursor(e, KEY_RIGHT, 1);
+
+	e->dirty = true;
 }
 
 
@@ -561,6 +565,7 @@ void editor_replace_byte(struct editor* e, char x) {
 	e->contents[offset] = x;
 	editor_move_cursor(e, KEY_RIGHT, 1);
 	editor_statusmessage(e, STATUS_INFO, "Replaced byte at offset %09x with %02x", offset, (unsigned char) x);
+	e->dirty = true;
 }
 
 
@@ -584,6 +589,25 @@ void editor_process_command(struct editor* e, const char* cmd) {
 
 			int offset = hex2int(ptr);
 			editor_scroll_to_offset(e, offset);
+			break;
+		}
+
+		if (strncmp(cmd, "w", INPUT_BUF_SIZE) == 0) {
+			editor_writefile(e);
+			break;
+		}
+
+		if (strncmp(cmd, "q", INPUT_BUF_SIZE) == 0) {
+			if (e->dirty) {
+				editor_statusmessage(e, STATUS_ERROR, "No write since last change (add ! to override)", cmd);
+				break;
+			} else {
+				exit(0);
+			}
+		}
+
+		if (strncmp(cmd, "q!", INPUT_BUF_SIZE) == 0) {
+			exit(0);
 			break;
 		}
 
@@ -816,6 +840,8 @@ void editor_process_keypress(struct editor* e) {
 			break;
 
 		case KEY_HOME:     e->cursor_x = 1; return;
+		// TODO: when END on the last line and octets are less than max per line,
+		// the offset is a bit fux0red.
 		case KEY_END:      e->cursor_x = e->octets_per_line; return;
 		case KEY_PAGEUP:   editor_scroll(e, -(e->screen_rows) + 2); return;
 		case KEY_PAGEDOWN: editor_scroll(e, e->screen_rows - 2); return;
