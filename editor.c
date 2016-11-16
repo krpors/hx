@@ -377,7 +377,7 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 			// start of a new row, beginning with an offset address in hex.
 			charbuf_appendf(b, "\x1b[0;33m%09x\e[0m:", offset);
 			// Initialize the ascii buffer to all zeroes, and reset the row char count.
-			memset(asc, 0, sizeof(asc));
+			memset(asc, '\0', sizeof(asc));
 			row_char_count = 0;
 			row++;
 		}
@@ -670,7 +670,7 @@ int editor_read_hex_input(struct editor* e, char* out) {
 		// escape the current mode to NORMAL, reset the hexstr and index so
 		// we can start afresh with the next REPLACE mode.
 		editor_setmode(e, MODE_NORMAL);
-		memset(hexstr, 0, 3);
+		memset(hexstr, '\0', 3);
 		hexstr_idx = 0;
 		return -1;
 	}
@@ -692,7 +692,7 @@ int editor_read_hex_input(struct editor* e, char* out) {
 	if (hexstr_idx >= 2) {
 		// Parse the hexstr to an actual char. Example: '65' will return 'e'.
 		*out = hex2bin(hexstr);
-		memset(hexstr, 0, 3);
+		memset(hexstr, '\0', 3);
 		hexstr_idx = 0;
 		return 0;
 	}
@@ -711,7 +711,7 @@ int editor_read_string(struct editor* e, char* dst, int len) {
 		strncpy(dst, e->inputbuffer, len);
 		// After copying, reset the index and the inputbuffer
 		e->inputbuffer_index = 0;
-		memset(e->inputbuffer, 0, sizeof(e->inputbuffer));
+		memset(e->inputbuffer,  '\0', sizeof(e->inputbuffer));
 		return c;
 	}
 
@@ -865,14 +865,14 @@ struct editor* editor_init() {
 	e->contents = NULL;
 	e->content_length = 0;
 
-	memset(e->status_message, 0, sizeof(e->status_message));
+	memset(e->status_message, '\0', sizeof(e->status_message));
 
 	e->mode = MODE_NORMAL;
 
-	memset(e->inputbuffer, 0, sizeof(e->inputbuffer));
+	memset(e->inputbuffer, '\0', sizeof(e->inputbuffer));
 	e->inputbuffer_index = 0;
 
-	memset(e->searchstr, 0, sizeof(e->searchstr));
+	memset(e->searchstr, '\0', sizeof(e->searchstr));
 
 	get_window_size(&(e->screen_rows), &(e->screen_cols));
 
