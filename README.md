@@ -63,7 +63,7 @@ Input is very basic. Cursor movement is not available. Only backspace/enter.
 # Implementation details
 The program uses raw ANSI escape sequences for manipulating colors, cursor
 positions and whatnot. The program first initializes the terminal in
-so-called mode (see `man termios`). Then keypresses are read, processed
+so-called raw mode (see `man termios`). Then keypresses are read, processed
 and then one function renders the contents, cursor and stuff.
 
 Not everything is final and some refactoring is needed. Valgrind doesn't

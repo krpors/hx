@@ -570,50 +570,47 @@ void editor_replace_byte(struct editor* e, char x) {
 
 
 void editor_process_command(struct editor* e, const char* cmd) {
-	do {
-		// Command: go to base 10 offset
-		bool b = is_pos_num(cmd);
-		if (b) {
-			int offset = str2int(cmd, 0, e->content_length, e->content_length - 1);
-			editor_scroll_to_offset(e, offset);
-			break;
+	// Command: go to base 10 offset
+	bool b = is_pos_num(cmd);
+	if (b) {
+		int offset = str2int(cmd, 0, e->content_length, e->content_length - 1);
+		editor_scroll_to_offset(e, offset);
+		return;
+	}
+
+	// Command: go to hex offset
+	if (cmd[0] == '0' && cmd[1] == 'x') {
+		const char* ptr = &cmd[2];
+		if (!is_hex(ptr)) {
+			editor_statusmessage(e, STATUS_ERROR, "Error: %s is not valid base 16", ptr);
+			return;
 		}
 
-		// Command: go to hex offset
-		if (cmd[0] == '0' && cmd[1] == 'x') {
-			const char* ptr = &cmd[2];
-			if (!is_hex(ptr)) {
-				editor_statusmessage(e, STATUS_ERROR, "Error: %s is not valid base 16", ptr);
-				break;
-			}
+		int offset = hex2int(ptr);
+		editor_scroll_to_offset(e, offset);
+		return;
+	}
 
-			int offset = hex2int(ptr);
-			editor_scroll_to_offset(e, offset);
-			break;
-		}
+	if (strncmp(cmd, "w", INPUT_BUF_SIZE) == 0) {
+		editor_writefile(e);
+		return;
+	}
 
-		if (strncmp(cmd, "w", INPUT_BUF_SIZE) == 0) {
-			editor_writefile(e);
-			break;
-		}
-
-		if (strncmp(cmd, "q", INPUT_BUF_SIZE) == 0) {
-			if (e->dirty) {
-				editor_statusmessage(e, STATUS_ERROR, "No write since last change (add ! to override)", cmd);
-				break;
-			} else {
-				exit(0);
-			}
-		}
-
-		if (strncmp(cmd, "q!", INPUT_BUF_SIZE) == 0) {
+	if (strncmp(cmd, "q", INPUT_BUF_SIZE) == 0) {
+		if (e->dirty) {
+			editor_statusmessage(e, STATUS_ERROR, "No write since last change (add ! to override)", cmd);
+			return;
+		} else {
 			exit(0);
-			break;
 		}
+	}
 
-		editor_statusmessage(e, STATUS_ERROR, "Command not found: %s", cmd);
-		break;
-	} while(false);
+	if (strncmp(cmd, "q!", INPUT_BUF_SIZE) == 0) {
+		exit(0);
+		return;
+	}
+
+	editor_statusmessage(e, STATUS_ERROR, "Command not found: %s", cmd);
 }
 
 void editor_process_search(struct editor* e, const char* str, enum search_direction dir) {
