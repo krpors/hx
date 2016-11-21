@@ -1,8 +1,8 @@
 # Read the version of the current commit.
 hx_git_hash := $(shell git rev-parse --verify HEAD --short=12)
 
-CC=gcc
-CFLAGS=-std=c99 -Wall -O3 -ggdb -DNDEBUG -DHX_GIT_HASH=\"$(hx_git_hash)\"
+# __BSD_VISIBLE for SIGWINCH on FreeBSD.
+CFLAGS=-std=c99 -Wall -O3 -ggdb -DNDEBUG -D__BSD_VISIBLE -DHX_GIT_HASH=\"$(hx_git_hash)\"
 
 objects=main.o editor.o charbuf.o util.o
 
