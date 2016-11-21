@@ -92,6 +92,7 @@ void debug_keypress() {
  * Handles the SIGWINCH signal upon terminal resizing.
  */
 static void handle_term_resize(int sig) {
+	// TODO: fix the handling of the async signal SIGWINCH properly.
 	clear_screen();
 	get_window_size(&(g_ec->screen_rows), &(g_ec->screen_cols));
 	editor_refresh_screen(g_ec);

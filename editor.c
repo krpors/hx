@@ -111,14 +111,7 @@ void editor_openfile(struct editor* e, const char* filename) {
 		exit(1);
 	}
 
-	// go to the end of the file.
-	fseek(fp, 0, SEEK_END);
-	// determine file size
-	long size = ftell(fp);
-	// set the indicator to the start of the file
-	fseek(fp, 0, SEEK_SET);
-
-	if (size <= 0) {
+	if (statbuf.st_size <= 0) {
 		// TODO: file size is empty, then what?
 		printf("File is empty.\n");
 		fflush(stdout);
@@ -128,9 +121,9 @@ void editor_openfile(struct editor* e, const char* filename) {
 	// allocate memory for the buffer. No need for extra
 	// room for a null string terminator, since we're possibly
 	// reading binary data only anyway (which can contain 0x00).
-	char* contents = malloc(sizeof(char) * size);
+	char* contents = malloc(sizeof(char) * statbuf.st_size);
 
-	if (fread(contents, size, 1, fp) <= 0) {
+	if (fread(contents, statbuf.st_size, 1, fp) <= 0) {
 		perror("Unable to read file contents");
 		free(contents);
 		exit(1);
@@ -140,7 +133,7 @@ void editor_openfile(struct editor* e, const char* filename) {
 	e->filename = malloc(strlen(filename) + 1);
 	strncpy(e->filename, filename, strlen(filename) + 1);
 	e->contents = contents;
-	e->content_length = size;
+	e->content_length = statbuf.st_size;
 
 	// Check if the file is readonly, and warn the user about that.
 	if (access(filename, W_OK) == -1) {
