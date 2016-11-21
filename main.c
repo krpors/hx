@@ -31,6 +31,9 @@
 // Comp unit wide editor config.
 static struct editor* g_ec;
 
+
+volatile sig_atomic_t resizeflag; // flag indicating a SIGWINCH signal was received.
+
 /**
  * Exits the editor, frees some stuff and resets the terminal setting.
  */
@@ -92,10 +95,17 @@ void debug_keypress() {
  * Handles the SIGWINCH signal upon terminal resizing.
  */
 static void handle_term_resize(int sig) {
-	// TODO: fix the handling of the async signal SIGWINCH properly.
+	// When the signal SIGWINCH is received, we set an sig_atomic_t variable
+	// called 'resizeflag' to 1. The read() in read_key() will be interrupted,
+	// and in the main loop we will detect that the flag is set.
+	// See https://www.securecoding.cert.org/confluence/display/c/SIG31-C.+Do+not+access+shared+objects+in+signal+handlers
+	// for more information.
+	resizeflag = 1;
+}
+
+static void resize_term() {
 	clear_screen();
 	get_window_size(&(g_ec->screen_rows), &(g_ec->screen_cols));
-	editor_refresh_screen(g_ec);
 }
 
 
@@ -143,6 +153,7 @@ int main(int argc, char* argv[]) {
 	memset(&act, 0, sizeof(struct sigaction));
 	act.sa_handler = handle_term_resize;
 	sigaction(SIGWINCH, &act, NULL);
+	resizeflag = 0;
 
 	// Editor configuration passed around.
 	g_ec = editor_init();
@@ -158,6 +169,10 @@ int main(int argc, char* argv[]) {
 	while (true) {
 		editor_refresh_screen(g_ec);
 		editor_process_keypress(g_ec);
+		if (resizeflag == 1) {
+			resize_term();
+			resizeflag = 0;
+		}
 		//debug_keypress();
 	}
 
