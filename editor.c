@@ -84,7 +84,7 @@ void editor_move_cursor(struct editor* e, int dir, int amount) {
 
 	// Did we hit the end of the file somehow? Set the cursor position
 	// to the maximum cursor position possible.
-	int offset = editor_offset_at_cursor(e);
+	unsigned int offset = editor_offset_at_cursor(e);
 	if (offset >= e->content_length - 1) {
 		editor_cursor_at_offset(e, offset, &e->cursor_x, &e->cursor_y);
 		return;
@@ -181,7 +181,7 @@ void editor_cursor_at_offset(struct editor* e, int offset, int* x, int* y) {
 
 
 void editor_delete_char_at_cursor(struct editor* e) {
-	int offset = editor_offset_at_cursor(e);
+	unsigned int offset = editor_offset_at_cursor(e);
 	int old_length = e->content_length;
 
 	if (e->content_length <= 0) {
@@ -210,7 +210,7 @@ void editor_delete_char_at_cursor(struct editor* e) {
 
 
 void editor_increment_byte(struct editor* e, int amount) {
-	int offset = editor_offset_at_cursor(e);
+	unsigned int offset = editor_offset_at_cursor(e);
 	e->contents[offset] += amount;
 }
 
@@ -221,7 +221,7 @@ inline int editor_offset_at_cursor(struct editor* e) {
 	// line into account (which is incremented when we are paging the content).
 	// Multiply it by octets_per_line since we're effectively addressing a one dimensional
 	// array.
-	int offset = (e->cursor_y - 1 + e->line) * e->octets_per_line + (e->cursor_x - 1);
+	unsigned int offset = (e->cursor_y - 1 + e->line) * e->octets_per_line + (e->cursor_x - 1);
 	// Safety measure. Since we're using the value of this function to
 	// index the content array, we must not go out of bounds.
 	if (offset <= 0) {
@@ -257,7 +257,7 @@ void editor_scroll(struct editor* e, int units) {
 }
 
 void editor_scroll_to_offset(struct editor* e, unsigned int offset) {
-	if (offset < 0 || offset > e->content_length) {
+	if (offset != 0 || offset > e->content_length) {
 		editor_statusmessage(e, STATUS_ERROR, "Out of range: 0x%09x (%u)", offset, offset);
 		return;
 	}
@@ -440,7 +440,7 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	charbuf_appendf(b, "\e[0K\e[2;80HOffset: %09x - %09x", start_offset, end_offset);
 	charbuf_appendf(b, "\e[0K\e[3;80H(y,x)=(%d,%d)", e->cursor_y, e->cursor_x);
 	charbuf_appendf(b, "\e[0K\e[4;80HHex line width: %d", e->hex_line_width);
-	int curr_offset = editor_offset_at_cursor(e);
+	unsigned int curr_offset = editor_offset_at_cursor(e);
 	charbuf_appendf(b, "\e[0K\e[5;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", e->line, curr_offset, (unsigned char) e->contents[curr_offset]);
 #endif
 }
@@ -456,7 +456,7 @@ void editor_render_ruler(struct editor* e, struct charbuf* b) {
 	char rulermsg[80]; // buffer for the actual message.
 	char buf[20];      // buffer for the cursor positioning
 
-	int offset_at_cursor = editor_offset_at_cursor(e);
+	unsigned int offset_at_cursor = editor_offset_at_cursor(e);
 	unsigned char val = e->contents[offset_at_cursor];
 	int percentage = (float)(offset_at_cursor + 1) / (float)e->content_length * 100;
 
@@ -540,7 +540,7 @@ void editor_insert_byte(struct editor* e, char x, bool after) {
 	// this extra byte.
 	e->contents = realloc(e->contents, e->content_length + 1);
 
-	int offset = editor_offset_at_cursor(e);
+	unsigned int offset = editor_offset_at_cursor(e);
 	if (after) {
 		offset++;
 	}
@@ -561,7 +561,7 @@ void editor_insert_byte(struct editor* e, char x, bool after) {
 
 
 void editor_replace_byte(struct editor* e, char x) {
-	int offset = editor_offset_at_cursor(e);
+	unsigned int offset = editor_offset_at_cursor(e);
 	e->contents[offset] = x;
 	editor_move_cursor(e, KEY_RIGHT, 1);
 	editor_statusmessage(e, STATUS_INFO, "Replaced byte at offset %09x with %02x", offset, (unsigned char) x);
@@ -627,11 +627,11 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 	}
 
 	// new search query, update searchstr.
-	if (!strncmp(str, e->searchstr, INPUT_BUF_SIZE) == 0) {
+	if (strncmp(str, e->searchstr, INPUT_BUF_SIZE) != 0) {
 		strncpy(e->searchstr, str, INPUT_BUF_SIZE);
 	}
 
-	int current_offset = editor_offset_at_cursor(e);
+	unsigned int current_offset = editor_offset_at_cursor(e);
 
 	if (dir == SEARCH_FORWARD) {
 		current_offset++;
@@ -643,7 +643,7 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 		}
 	} else if (dir == SEARCH_BACKWARD) {
 		current_offset--;
-		for (; current_offset >= 0; current_offset--) {
+		for (; current_offset != 0; current_offset--) {
 			if (memcmp(e->contents + current_offset, str, strlen(str)) == 0) {
 				editor_scroll_to_offset(e, current_offset);
 				current_offset--;
