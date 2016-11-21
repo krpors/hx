@@ -250,7 +250,7 @@ void editor_scroll(struct editor* e, int units) {
 }
 
 void editor_scroll_to_offset(struct editor* e, unsigned int offset) {
-	if (offset != 0 || offset > e->content_length) {
+	if (offset == 0 || offset > e->content_length) {
 		editor_statusmessage(e, STATUS_ERROR, "Out of range: 0x%09x (%u)", offset, offset);
 		return;
 	}
