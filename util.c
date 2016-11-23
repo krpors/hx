@@ -79,7 +79,8 @@ inline int clampi(int i, int min, int max) {
 
 int str2int(const char* s, int min, int max, int def) {
 	char* endptr;
-	uintmax_t x = strtoimax(s, &endptr, 10);
+	errno = 0;
+	intmax_t x = strtoimax(s, &endptr, 10);
 	if (errno  == ERANGE) {
 		return def;
 	}

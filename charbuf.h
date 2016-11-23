@@ -34,9 +34,7 @@ struct charbuf* charbuf_create();
 void charbuf_free(struct charbuf* buf);
 
 /**
- * Appends `what' to the charbuf, writing at most `len' bytes. Note that
- * if we use snprintf() to format a particular string, we have to subtract
- * 1 from the `len', to discard the null terminator character.
+ * Appends `what' to the charbuf, writing exactly `len' bytes.
  */
 void charbuf_append(struct charbuf* buf, const char* what, size_t len);
 

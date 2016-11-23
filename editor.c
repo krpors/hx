@@ -123,7 +123,7 @@ void editor_openfile(struct editor* e, const char* filename) {
 	// reading binary data only anyway (which can contain 0x00).
 	char* contents = malloc(sizeof(char) * statbuf.st_size);
 
-	if (fread(contents, statbuf.st_size, 1, fp) <= 0) {
+	if (fread(contents, 1, statbuf.st_size, fp) < statbuf.st_size) {
 		perror("Unable to read file contents");
 		free(contents);
 		exit(1);
