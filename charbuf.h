@@ -6,8 +6,8 @@
 
 #include <stdlib.h> // size_t
 
-#ifndef _HX_CHARBUF
-#define _HX_CHARBUF
+#ifndef HX_CHARBUF_H
+#define HX_CHARBUF_H
 
 static const int CHARBUF_APPENDF_SIZE = 1024;
 
@@ -53,4 +53,4 @@ int charbuf_appendf(struct charbuf* buf, const char* what, ...);
  */
 void charbuf_draw(struct charbuf* buf);
 
-#endif // _HX_CHARBUF
+#endif // HX_CHARBUF_H

@@ -4,16 +4,17 @@ hx_git_hash := $(shell git rev-parse --verify HEAD --short=12)
 # __BSD_VISIBLE for SIGWINCH on FreeBSD.
 CFLAGS=-std=c99 -Wall -O3 -ggdb -DNDEBUG -D__BSD_VISIBLE -DHX_GIT_HASH=\"$(hx_git_hash)\"
 
-objects=main.o editor.o charbuf.o util.o
+objects=main.o editor.o charbuf.o util.o undo.o
 
 # Make use of implicit rules to build the hx binary.
 hx: $(objects)
 	$(CC) -o $@ $(CFLAGS) $(objects)
 
-main.o: charbuf.o util.o
+main.o: charbuf.o util.o undo.o
 editor.o: editor.h charbuf.o util.o
 charbuf.o: charbuf.h
 util.o: util.h
+undo.o: undo.h
 
 hx.1.gz: hx.1
 	gzip -k hx.1

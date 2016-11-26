@@ -4,8 +4,8 @@
  * Copyright (c) 2016 Kevin Pors. See LICENSE for details.
  */
 
-#ifndef _HX_UTIL_H
-#define _HX_UTIL_H
+#ifndef HX_UTIL_H
+#define HX_UTIL_H
 
 #include <stdbool.h>
 #include <termios.h>
@@ -69,4 +69,4 @@ int clampi(int i, int min, int max);
  */
 int str2int(const char* s, int min, int max, int def);
 
-#endif // _HX_UTIL_H
+#endif // HX_UTIL_H

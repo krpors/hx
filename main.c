@@ -9,6 +9,7 @@
 
 #include "editor.h"
 #include "util.h"
+#include "undo.h"
 
 // C99 includes
 #include <stdio.h>
@@ -107,7 +108,6 @@ static void resize_term() {
 	clear_screen();
 	get_window_size(&(g_ec->screen_rows), &(g_ec->screen_cols));
 }
-
 
 int main(int argc, char* argv[]) {
 	char* file = NULL;

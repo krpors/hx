@@ -4,8 +4,8 @@
  * Copyright (c) 2016 Kevin Pors. See LICENSE for details.
  */
 
-#ifndef _HX_EDITOR_H
-#define _HX_EDITOR_H
+#ifndef HX_EDITOR_H
+#define HX_EDITOR_H
 
 #include "charbuf.h"
 
@@ -70,6 +70,8 @@ struct editor {
 	int inputbuffer_index; // the index of the current typed key shiz.
 
 	char searchstr[INPUT_BUF_SIZE]; // the current search string or NULL if none.
+
+	struct action_list* undo_list; // tail of the list
 };
 
 /**

@@ -6,6 +6,7 @@
 
 #include "editor.h"
 #include "util.h"
+#include "undo.h"
 
 #include <assert.h>
 #include <ctype.h>
@@ -175,6 +176,7 @@ void editor_cursor_at_offset(struct editor* e, int offset, int* x, int* y) {
 
 void editor_delete_char_at_cursor(struct editor* e) {
 	unsigned int offset = editor_offset_at_cursor(e);
+	unsigned char charat = e->contents[offset];
 	int old_length = e->content_length;
 
 	if (e->content_length <= 0) {
@@ -199,6 +201,8 @@ void editor_delete_char_at_cursor(struct editor* e) {
 	if (offset >= old_length - 1) {
 		editor_move_cursor(e, KEY_LEFT, 1);
 	}
+
+	action_list_add(e->undo_list, ACTION_DELETE, offset, charat);
 }
 
 
@@ -811,6 +815,8 @@ void editor_process_keypress(struct editor* e) {
 		case ':': editor_setmode(e, MODE_COMMAND); return;
 		case '/': editor_setmode(e, MODE_SEARCH);  return;
 
+		case 'd': action_list_print(e->undo_list); return;
+
 		// move `grouping` amount back or forward:
 		case 'b': editor_move_cursor(e, KEY_LEFT, e->grouping); break;
 		case 'w': editor_move_cursor(e, KEY_RIGHT, e->grouping); break;
@@ -866,10 +872,13 @@ struct editor* editor_init() {
 
 	get_window_size(&(e->screen_rows), &(e->screen_cols));
 
+	e->undo_list = action_list_init();
+
 	return e;
 }
 
 void editor_free(struct editor* e) {
+	action_list_free(e->undo_list);
 	free(e->filename);
 	free(e->contents);
 	free(e);
