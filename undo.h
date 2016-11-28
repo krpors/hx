@@ -42,6 +42,7 @@ struct action_list {
 
 struct action_list* action_list_init();
 void action_list_add(struct action_list* list, enum action_type type, int offset, unsigned char c);
+void action_list_delete(struct action_list* list, struct action* action);
 void action_list_free(struct action_list* list);
 void action_list_print(struct action_list* list);
 

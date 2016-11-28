@@ -533,11 +533,15 @@ void editor_refresh_screen(struct editor* e) {
 
 
 void editor_insert_byte(struct editor* e, char x, bool after) {
+	int offset = editor_offset_at_cursor(e);
+	editor_insert_byte_at_offset(e, offset, x, after);
+}
+
+void editor_insert_byte_at_offset(struct editor* e, unsigned int offset, char x, bool after) {
 	// We are inserting a single character. Reallocate memory to contain
 	// this extra byte.
 	e->contents = realloc(e->contents, e->content_length + 1);
 
-	unsigned int offset = editor_offset_at_cursor(e);
 	if (after) {
 		offset++;
 	}
@@ -551,9 +555,8 @@ void editor_insert_byte(struct editor* e, char x, bool after) {
 	// Increase the content length since we inserted a character.
 	e->content_length++;
 
-	editor_move_cursor(e, KEY_RIGHT, 1);
-
 	e->dirty = true;
+
 }
 
 
@@ -744,6 +747,7 @@ void editor_process_keypress(struct editor* e) {
 		char out = 0;
 		if (editor_read_hex_input(e, &out) != -1) {
 			editor_insert_byte(e, out, e->mode & MODE_APPEND);
+			editor_move_cursor(e, KEY_RIGHT, 1);
 		}
 		return;
 	}
@@ -815,6 +819,7 @@ void editor_process_keypress(struct editor* e) {
 		case ':': editor_setmode(e, MODE_COMMAND); return;
 		case '/': editor_setmode(e, MODE_SEARCH);  return;
 
+		case 'u': editor_undo(e); return;
 		case 'd': action_list_print(e->undo_list); return;
 
 		// move `grouping` amount back or forward:
@@ -843,6 +848,36 @@ void editor_process_keypress(struct editor* e) {
 		case KEY_PAGEDOWN: editor_scroll(e, e->screen_rows - 2); return;
 		}
 	}
+}
+
+void editor_undo(struct editor* e) {
+	struct action* last_action = e->undo_list->tail;
+	if (last_action == NULL) {
+		editor_statusmessage(e, STATUS_INFO, "No action to undo");
+		return;
+	}
+
+	switch (last_action->act) {
+	case ACTION_NONE: return;
+	case ACTION_APPEND:
+		// TODO: editor_delete_char_at_offset()
+		break;
+	case ACTION_DELETE:
+		editor_insert_byte_at_offset(e, last_action->offset, last_action->c, false);
+		break;
+	case ACTION_REPLACE:
+		// TODO: editor_replace_byte_at_offset()
+		break;
+	case ACTION_INSERT: break;
+	}
+
+	// move cursor to the undone action's offset.
+	// TODO: do not necessarily re-center on screen.
+	editor_scroll_to_offset(e, last_action->offset);
+
+
+	// pop it for now, from the list.
+	action_list_delete(e->undo_list, last_action);
 }
 
 /**

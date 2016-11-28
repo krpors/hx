@@ -103,6 +103,12 @@ void editor_increment_byte(struct editor* e, int amount);
 void editor_insert_byte(struct editor* e, char x, bool after);
 
 /**
+ * Inserts the character byte at the given offset, or after the given offset if
+ * `after' is set to true.
+ */
+void editor_insert_byte_at_offset(struct editor* e, unsigned int offset, char x, bool after);
+
+/**
  * Moves the cursor. The terminal cursor positions are all 1-based, so we
  * take that into account. When we scroll past boundaries (left, right, up
  * and down) we react accordingly. Note that the cursor_x/y are also 1-based,
@@ -217,6 +223,11 @@ void editor_setmode(struct editor *e, enum editor_mode mode);
  * Sets statusmessage, including color depending on severity.
  */
 int editor_statusmessage(struct editor* e, enum status_severity s, const char* fmt, ...);
+
+/**
+ * Undoes an action.
+ */
+void editor_undo(struct editor* e);
 
 /**
  * Writes the contents of the editor's buffer the to the same filename.

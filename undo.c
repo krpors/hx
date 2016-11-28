@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <stdio.h>
+#include <stdbool.h>
 #include <assert.h>
 
 static const char* action_names[] = {
@@ -44,6 +45,44 @@ void action_list_add(struct action_list* list, enum action_type type, int offset
 	}
 }
 
+void action_list_delete(struct action_list* list, struct action* action) {
+	assert(list != NULL);
+	assert(action != NULL);
+
+	// Suppose this is the list, and [c] must be deleted
+	//
+	//   [a] -> [b] -> [c] -> [d] -> END
+	//
+	// The result will become:
+	//
+	//   [a] -> [b] -> END
+	//
+	// The tail will be the previous of 'c', and the next
+	// value of 'b' will point to nothing.
+
+	// Check if the 'action' is the first element.
+	if (action->prev != NULL) {
+		list->tail = action->prev;
+		list->tail->next = NULL;
+	}
+
+	bool remove = (action == list->head);
+
+	// temp node
+	struct action* node = action;
+	while (node != NULL) {
+		struct action* temp = node;
+		node = temp->next;
+		free(temp);
+		temp = NULL;
+	}
+
+	if (remove) {
+		list->head = NULL;
+		list->tail = NULL;
+	}
+}
+
 void action_list_free(struct action_list* list) {
 	assert(list != NULL);
 
@@ -60,6 +99,10 @@ void action_list_free(struct action_list* list) {
 
 void action_list_print(struct action_list* list) {
 	struct action* node = list->head;
+	if (node == NULL) {
+		fprintf(stderr, "Nothing to delete, head is null\n");
+		return;
+	}
 	while (node != NULL) {
 		fprintf(stderr, "(%d, %s, %02x) -> ", node->offset, action_names[node->act], node->c);
 		node = node->next;
