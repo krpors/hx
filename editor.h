@@ -93,6 +93,9 @@ void editor_cursor_at_offset(struct editor* e, int offset, int* x, int *y);
  * words, the current offset the cursor is at).
  */
 void editor_delete_char_at_cursor(struct editor* e);
+
+void editor_delete_char_at_offset(struct editor* e, unsigned int offset);
+
 void editor_free(struct editor* e);
 void editor_increment_byte(struct editor* e, int amount);
 

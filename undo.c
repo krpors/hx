@@ -6,7 +6,6 @@
 #include <assert.h>
 
 static const char* action_names[] = {
-	"none",
 	"delete",
 	"insert",
 	"replace",
@@ -92,6 +91,8 @@ void action_list_free(struct action_list* list) {
 		node = node->next;
 		free(temp);
 	}
+	// after removing all linked nodes from the head,
+	// dont forget to remove the head as well:
 	free(node);
 	free(list);
 }

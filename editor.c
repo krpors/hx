@@ -185,15 +185,7 @@ void editor_delete_char_at_cursor(struct editor* e) {
 	}
 
 	// FIXME: when all chars have been removed from a file, this blows up.
-
-	// Remove an element from the contents buffer by moving memory.
-	// The character at the current offset is supposed to be removed.
-	// Take the offset + 1, until the end of the buffer. Copy that
-	// part over the offset, reallocate the contents buffer with one
-	// character in size less.
-	memmove(e->contents + offset, e->contents + offset + 1 , e->content_length - offset - 1);
-	e->contents = realloc(e->contents, e->content_length - 1);
-	e->content_length--;
+	editor_delete_char_at_offset(e, offset);
 	e->dirty = true;
 
 	// if the deleted offset was the maximum offset, move the cursor to
@@ -203,6 +195,18 @@ void editor_delete_char_at_cursor(struct editor* e) {
 	}
 
 	action_list_add(e->undo_list, ACTION_DELETE, offset, charat);
+}
+
+void editor_delete_char_at_offset(struct editor* e, unsigned int offset) {
+	// Remove an element from the contents buffer by moving memory.
+	// The character at the current offset is supposed to be removed.
+	// Take the offset + 1, until the end of the buffer. Copy that
+	// part over the offset, reallocate the contents buffer with one
+	// character in size less.
+	memmove(e->contents + offset, e->contents + offset + 1 , e->content_length - offset - 1);
+	e->contents = realloc(e->contents, e->content_length - 1);
+	e->content_length--;
+
 }
 
 
@@ -254,8 +258,22 @@ void editor_scroll(struct editor* e, int units) {
 }
 
 void editor_scroll_to_offset(struct editor* e, unsigned int offset) {
-	if (offset == 0 || offset > e->content_length) {
+	if (offset > e->content_length) {
 		editor_statusmessage(e, STATUS_ERROR, "Out of range: 0x%09x (%u)", offset, offset);
+		return;
+	}
+
+	// Check if the offset is within range of the current display.
+	// Calculate the minimum offset visible, and the maximum. If
+	// the requested offset is within that range, do not update
+	// the e->line yet (i.e. do not scroll).
+	int offset_min = e->line * e->octets_per_line;
+	int offset_max = offset_min + (e->screen_rows * e->octets_per_line);
+
+	if (offset >= offset_min && offset <= offset_max) {
+		// We're within range! Update the cursor position, but
+		// do not scroll, and just return.
+		editor_cursor_at_offset(e, offset, &(e->cursor_x), &(e->cursor_y));
 		return;
 	}
 
@@ -277,8 +295,6 @@ void editor_scroll_to_offset(struct editor* e, unsigned int offset) {
 	}
 
 	editor_cursor_at_offset(e, offset, &(e->cursor_x), &(e->cursor_y));
-
-	editor_statusmessage(e, STATUS_INFO, "Positioned to offset 0x%09x (%d)", offset, offset);
 }
 
 void editor_setmode(struct editor* e, enum editor_mode mode) {
@@ -535,6 +551,12 @@ void editor_refresh_screen(struct editor* e) {
 void editor_insert_byte(struct editor* e, char x, bool after) {
 	int offset = editor_offset_at_cursor(e);
 	editor_insert_byte_at_offset(e, offset, x, after);
+
+	if (after) {
+		action_list_add(e->undo_list, ACTION_APPEND, offset, x);
+	} else {
+		action_list_add(e->undo_list, ACTION_INSERT, offset, x);
+	}
 }
 
 void editor_insert_byte_at_offset(struct editor* e, unsigned int offset, char x, bool after) {
@@ -575,6 +597,7 @@ void editor_process_command(struct editor* e, const char* cmd) {
 	if (b) {
 		int offset = str2int(cmd, 0, e->content_length, e->content_length - 1);
 		editor_scroll_to_offset(e, offset);
+		editor_statusmessage(e, STATUS_INFO, "Positioned to offset 0x%09x (%d)", offset, offset);
 		return;
 	}
 
@@ -588,6 +611,7 @@ void editor_process_command(struct editor* e, const char* cmd) {
 
 		int offset = hex2int(ptr);
 		editor_scroll_to_offset(e, offset);
+		editor_statusmessage(e, STATUS_INFO, "Positioned to offset 0x%09x (%d)", offset, offset);
 		return;
 	}
 
@@ -615,7 +639,7 @@ void editor_process_command(struct editor* e, const char* cmd) {
 
 void editor_process_search(struct editor* e, const char* str, enum search_direction dir) {
 	if (str[0] == '0' && str[1] == 'x') {
-		// search hex value in e->contents
+		// TODO: search hex value in e->contents
 		return;
 	}
 
@@ -637,6 +661,7 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 		current_offset++;
 		for (; current_offset < e->content_length; current_offset++) {
 			if (memcmp(e->contents + current_offset, str, strlen(str)) == 0) {
+				editor_statusmessage(e, STATUS_INFO, "");
 				editor_scroll_to_offset(e, current_offset);
 				return;
 			}
@@ -645,6 +670,7 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 		current_offset--;
 		for (; current_offset != 0; current_offset--) {
 			if (memcmp(e->contents + current_offset, str, strlen(str)) == 0) {
+				editor_statusmessage(e, STATUS_INFO, "");
 				editor_scroll_to_offset(e, current_offset);
 				current_offset--;
 				return;
@@ -858,9 +884,8 @@ void editor_undo(struct editor* e) {
 	}
 
 	switch (last_action->act) {
-	case ACTION_NONE: return;
 	case ACTION_APPEND:
-		// TODO: editor_delete_char_at_offset()
+		editor_delete_char_at_offset(e, last_action->offset+1);
 		break;
 	case ACTION_DELETE:
 		editor_insert_byte_at_offset(e, last_action->offset, last_action->c, false);
@@ -868,11 +893,12 @@ void editor_undo(struct editor* e) {
 	case ACTION_REPLACE:
 		// TODO: editor_replace_byte_at_offset()
 		break;
-	case ACTION_INSERT: break;
+	case ACTION_INSERT:
+		editor_delete_char_at_offset(e, last_action->offset);
+		break;
 	}
 
 	// move cursor to the undone action's offset.
-	// TODO: do not necessarily re-center on screen.
 	editor_scroll_to_offset(e, last_action->offset);
 
 
