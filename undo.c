@@ -12,6 +12,10 @@ static const char* action_names[] = {
 	"append"
 };
 
+const char* action_type_name(enum action_type type) {
+	return action_names[type];
+}
+
 
 struct action_list* action_list_init() {
 	struct action_list* list = malloc(sizeof(struct action_list));
@@ -111,5 +115,15 @@ void action_list_print(struct action_list* list) {
 			fprintf(stderr, "END\n");
 		}
 	}
+}
+
+unsigned int action_list_size(struct action_list* list) {
+	unsigned int size = 0;
+	struct action* node = list->head;
+	while (node != NULL) {
+		node = node->next;
+		size++;
+	}
+	return size;
 }
 

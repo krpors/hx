@@ -203,6 +203,11 @@ void editor_refresh_screen(struct editor* e);
 void editor_replace_byte(struct editor* e, char x);
 
 /**
+ * Replaces a byte(char) `x' at the given `offset'.
+ */
+void editor_replace_byte_at_offset(struct editor* e, unsigned int offset, char x);
+
+/**
  * Scrolls the editor by updating the `line' accordingly, within
  * the bounds of the readable parts of the buffer.
  */

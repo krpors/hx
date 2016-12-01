@@ -38,6 +38,14 @@ struct action {
 	unsigned char c;      // the character inserted, deleted, etc.
 };
 
+
+/**
+ * Simply returns the name of the action corresponding to the given enum type.
+ * This is defined as a function to prevent declaring `action_names' as extern
+ * in other source files.
+ */
+const char* action_type_name(enum action_type type);
+
 /**
  * The action_list contains head and tail information. Functions are defined
  * to operate on this struct to add or delete `action's.
@@ -77,5 +85,9 @@ void action_list_free(struct action_list* list);
  */
 void action_list_print(struct action_list* list);
 
+/**
+ * Gets the size of the list.
+ */
+unsigned int action_list_size(struct action_list* list);
 
 #endif // HX_UNDO_H

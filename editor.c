@@ -212,7 +212,10 @@ void editor_delete_char_at_offset(struct editor* e, unsigned int offset) {
 
 void editor_increment_byte(struct editor* e, int amount) {
 	unsigned int offset = editor_offset_at_cursor(e);
+	unsigned char prev = e->contents[offset];
 	e->contents[offset] += amount;
+
+	action_list_add(e->undo_list, ACTION_REPLACE, offset, prev);
 }
 
 
@@ -505,7 +508,7 @@ void editor_render_status(struct editor* e, struct charbuf* b) {
 	}
 
 	charbuf_append(b, e->status_message, strlen(e->status_message));
-	charbuf_append(b, "\x1b[0m", 4);
+	charbuf_append(b, "\x1b[0m\x1b[0K", 8);
 }
 
 
@@ -584,12 +587,14 @@ void editor_insert_byte_at_offset(struct editor* e, unsigned int offset, char x,
 
 void editor_replace_byte(struct editor* e, char x) {
 	unsigned int offset = editor_offset_at_cursor(e);
+	unsigned char prev = e->contents[offset];
 	e->contents[offset] = x;
 	editor_move_cursor(e, KEY_RIGHT, 1);
 	editor_statusmessage(e, STATUS_INFO, "Replaced byte at offset %09x with %02x", offset, (unsigned char) x);
 	e->dirty = true;
-}
 
+	action_list_add(e->undo_list, ACTION_REPLACE, offset, prev);
+}
 
 void editor_process_command(struct editor* e, const char* cmd) {
 	// Command: go to base 10 offset
@@ -891,7 +896,7 @@ void editor_undo(struct editor* e) {
 		editor_insert_byte_at_offset(e, last_action->offset, last_action->c, false);
 		break;
 	case ACTION_REPLACE:
-		// TODO: editor_replace_byte_at_offset()
+		e->contents[last_action->offset] = last_action->c;
 		break;
 	case ACTION_INSERT:
 		editor_delete_char_at_offset(e, last_action->offset);
@@ -901,9 +906,17 @@ void editor_undo(struct editor* e) {
 	// move cursor to the undone action's offset.
 	editor_scroll_to_offset(e, last_action->offset);
 
+	editor_statusmessage(e, STATUS_INFO,
+		"Reverted '%s' at offset %d to byte '%02x' (%d left)",
+			action_type_name(last_action->act),
+			last_action->offset,
+			last_action->c,
+			action_list_size(e->undo_list) - 1); // subtract one due to the deletion
+			                                     // in the next statement
 
 	// pop it for now, from the list.
 	action_list_delete(e->undo_list, last_action);
+
 }
 
 /**
