@@ -446,7 +446,7 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	}
 
 	// clear everything up until the end
-	charbuf_append(b, "\x1b[0J", 4);
+	charbuf_append(b, "\x1b[0K", 4);
 
 #ifndef NDEBUG
 	charbuf_appendf(b, "\e[0m\e[1;35m\e[1;80HRows: %d", e->screen_rows);
