@@ -851,7 +851,6 @@ void editor_process_keypress(struct editor* e) {
 		case '/': editor_setmode(e, MODE_SEARCH);  return;
 
 		case 'u': editor_undo(e); return;
-		case 'd': action_list_print(e->undo_list); return;
 
 		// move `grouping` amount back or forward:
 		case 'b': editor_move_cursor(e, KEY_LEFT, e->grouping); break;

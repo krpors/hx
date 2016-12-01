@@ -36,6 +36,7 @@ Keys which can be used:
 	/       : Start search input.
 	n       : Search for next occurrence.
 	N       : Search for previous occurrence.
+	u       : Undo the last action.
 
 	a       : Append mode. Appends a byte after the current cursor position.
 	i       : Insert mode. Inserts a byte at the current cursor position.
@@ -71,6 +72,6 @@ report any leaks so that looks OK :)
 
 # Wishlist and TODOs
 
-1. Searching a string or byte sequence.
-1. Colorize changes made to a file
-1. Undo/redo actions
+1. Colorize changes made to a file?
+1. Searching a byte sequence. Search based on a string works!
+1. Redo actions? Undo works!

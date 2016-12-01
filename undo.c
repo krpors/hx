@@ -120,8 +120,7 @@ void action_list_print(struct action_list* list) {
 unsigned int action_list_size(struct action_list* list) {
 	unsigned int size = 0;
 	struct action* node = list->head;
-	while (node != NULL) {
-		node = node->next;
+	for (node = list->head; node != NULL; node = node->next) {
 		size++;
 	}
 	return size;
