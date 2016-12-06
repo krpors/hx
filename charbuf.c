@@ -1,3 +1,9 @@
+/*
+ * This file is part of hx - a hex editor for the terminal.
+ *
+ * Copyright (c) 2016 Kevin Pors. See LICENSE for details.
+ */
+
 #include "charbuf.h"
 
 #include <assert.h>
