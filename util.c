@@ -103,16 +103,10 @@ int read_key() {
 	// check == 0 to see if EOF.
 	while ((nread = read(STDIN_FILENO, &c, 1)) == 0);
 	if (nread == -1) {
-		// This error may happen when a SIGWINCH is received by resizing the terminal.
-		// The read() call is interrupted and will fail here. In that case, just return
-		// -1 prematurely and continue the main loop. In all other cases, this will
-		// be unexpected so inform the user that something has happened.
-		if (errno == EINTR) {
-			return -1;
-		}
-
-		fprintf(stderr, "Unable to read from stdin: %s\n", strerror(errno));
-		exit(2);
+		// When the read call is interrupted by a signal (such as SIGWINCH), the
+		// nread will be -1. In that case, just return -1 prematurely and continue
+		// the main loop.
+		return -1;
 	}
 
 	char seq[4]; // escape sequence buffer.
