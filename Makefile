@@ -5,8 +5,8 @@ hx_version := $(shell git describe --tags 2>/dev/null || echo "1.0.0")
 # __BSD_VISIBLE for SIGWINCH on FreeBSD.
 CPPFLAGS = -DNDEBUG -D__BSD_VISIBLE \
        -DHX_GIT_HASH=\"$(hx_git_hash)\" -DHX_VERSION=\"$(hx_version)\"
-CFLAGS=-std=c99 -Wall -Wextra -Wpedantic -O3 -ggdb -MMD -MP
-LDFLAGS = -O3 -ggdb
+CFLAGS=-std=c99 -Wall -Wextra -Wpedantic -O3 -MMD -MP
+LDFLAGS = -O3
 
 objects=hx.o editor.o charbuf.o util.o undo.o
 
@@ -19,6 +19,11 @@ all: hx hx.1.gz
 
 # Make use of implicit rules to build the hx binary.
 hx: $(objects)
+
+.PHONY: debug
+debug: all
+debug: CFLAGS += -ggdb -Og
+debug: LDFLAGS += -ggdb -Og
 
 %.gz: %
 	gzip -k $<
