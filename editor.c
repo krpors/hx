@@ -176,15 +176,14 @@ void editor_cursor_at_offset(struct editor* e, int offset, int* x, int* y) {
 
 void editor_delete_char_at_cursor(struct editor* e) {
 	unsigned int offset = editor_offset_at_cursor(e);
-	unsigned char charat = e->contents[offset];
 	int old_length = e->content_length;
 
 	if (e->content_length <= 0) {
 		editor_statusmessage(e, STATUS_WARNING, "Nothing to delete");
 		return;
 	}
-
-	// FIXME: when all chars have been removed from a file, this blows up.
+	
+	unsigned char charat = e->contents[offset];
 	editor_delete_char_at_offset(e, offset);
 	e->dirty = true;
 
@@ -193,7 +192,6 @@ void editor_delete_char_at_cursor(struct editor* e) {
 	if (offset >= old_length - 1) {
 		editor_move_cursor(e, KEY_LEFT, 1);
 	}
-
 	action_list_add(e->undo_list, ACTION_DELETE, offset, charat);
 }
 
