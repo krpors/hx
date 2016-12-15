@@ -10,8 +10,8 @@ objects=main.o editor.o charbuf.o util.o undo.o
 hx: $(objects)
 	$(CC) -o $@ $(CFLAGS) $(objects)
 
-main.o: charbuf.o util.o undo.o editor.o
-editor.o: editor.h charbuf.o util.o undo.o
+main.o: editor.h util.h undo.h
+editor.o: editor.h util.h undo.h
 charbuf.o: charbuf.h
 util.o: util.h
 undo.o: undo.h
