@@ -7,6 +7,9 @@ LDFLAGS = -O3 -ggdb
 
 objects=hx.o editor.o charbuf.o util.o undo.o
 
+.PHONY: all
+all: hx hx.1.gz
+
 # Make use of implicit rules to build the hx binary.
 hx: $(objects)
 
@@ -18,9 +21,6 @@ undo.o: undo.h
 
 hx.1.gz: hx.1
 	gzip -k hx.1
-
-.PHONY: all
-all: hx hx.1.gz
 
 .PHONY: install
 install: all
