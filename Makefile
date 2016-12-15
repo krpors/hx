@@ -8,6 +8,10 @@ LDFLAGS = -O3 -ggdb
 
 objects=hx.o editor.o charbuf.o util.o undo.o
 
+PREFIX ?= /usr/local
+bindir = /bin
+mandir = /man
+
 .PHONY: all
 all: hx hx.1.gz
 
@@ -19,8 +23,8 @@ hx: $(objects)
 
 .PHONY: install
 install: all
-	install -s ./hx /usr/bin
-	install ./hx.1.gz /usr/share/man/man1
+	install -Dm755 -s ./hx -t $(DESTDIR)$(PREFIX)$(bindir)
+	install -Dm644 ./hx.1.gz -t $(DESTDIR)$(PREFIX)$(mandir)/man1
 
 .PHONY: clean
 clean:
