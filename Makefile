@@ -24,7 +24,6 @@ all: hx hx.1.gz
 
 .PHONY: install
 install: all
-	@[ `id -u` = 0 ] || { echo "Root required to install."; exit 1; }
 	install -s ./hx /usr/bin
 	install ./hx.1.gz /usr/share/man/man1
 
