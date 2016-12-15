@@ -29,4 +29,4 @@ install: all
 
 .PHONY: clean
 clean:
-	rm -f *.o hx.1.gz hx
+	$(RM) *.o hx.1.gz hx
