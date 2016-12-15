@@ -57,10 +57,10 @@ struct editor {
 
 	enum editor_mode mode; // mode the editor is in
 
-	bool  dirty;          // whether the buffer is modified
-	char* filename;       // the filename currently open
-	char* contents;       // the file's contents
-	int   content_length; // length of the contents
+	bool         dirty;          // whether the buffer is modified
+	char*        filename;       // the filename currently open
+	char*        contents;       // the file's contents
+	unsigned int content_length; // length of the contents
 
 	enum status_severity status_severity;     // status severity
 	char                 status_message[120]; // status message

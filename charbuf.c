@@ -48,7 +48,7 @@ void charbuf_append(struct charbuf* buf, const char* what, size_t len) {
 
 	// Prevent reallocing a lot by using some sort of geometric progression
 	// by increasing the cap with len, then doubling it.
-	if (buf->len + len >= buf->cap) {
+	if ((int)(buf->len + len) >= buf->cap) {
 		buf->cap += len;
 		buf->cap *= 2;
 		// reallocate with twice the capacity

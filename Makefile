@@ -2,7 +2,7 @@
 hx_git_hash := $(shell git rev-parse --verify HEAD --short=12)
 
 # __BSD_VISIBLE for SIGWINCH on FreeBSD.
-CFLAGS=-std=c99 -Wall -O3 -ggdb -DNDEBUG -D__BSD_VISIBLE -DHX_GIT_HASH=\"$(hx_git_hash)\"
+CFLAGS=-std=c99 -Wall -Wextra -Wpedantic -O3 -ggdb -DNDEBUG -D__BSD_VISIBLE -DHX_GIT_HASH=\"$(hx_git_hash)\"
 
 objects=main.o editor.o charbuf.o util.o undo.o
 

@@ -101,6 +101,8 @@ void debug_keypress() {
  * Handles the SIGWINCH signal upon terminal resizing.
  */
 static void handle_term_resize(int sig) {
+	(void)(sig); // suppress compiler warning about unused param.
+
 	// When the signal SIGWINCH is received, we set an sig_atomic_t variable
 	// called 'resizeflag' to 1. The read() in read_key() will be interrupted,
 	// and in the main loop we will detect that the flag is set.

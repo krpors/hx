@@ -124,7 +124,7 @@ void editor_openfile(struct editor* e, const char* filename) {
 	// reading binary data only anyway (which can contain 0x00).
 	char* contents = malloc(sizeof(char) * statbuf.st_size);
 
-	if (fread(contents, 1, statbuf.st_size, fp) < statbuf.st_size) {
+	if (fread(contents, 1, statbuf.st_size, fp) < (size_t) statbuf.st_size) {
 		perror("Unable to read file contents");
 		free(contents);
 		exit(1);
@@ -176,7 +176,7 @@ void editor_cursor_at_offset(struct editor* e, int offset, int* x, int* y) {
 
 void editor_delete_char_at_cursor(struct editor* e) {
 	unsigned int offset = editor_offset_at_cursor(e);
-	int old_length = e->content_length;
+	unsigned int old_length = e->content_length;
 
 	if (e->content_length <= 0) {
 		editor_statusmessage(e, STATUS_WARNING, "Nothing to delete");
@@ -268,8 +268,8 @@ void editor_scroll_to_offset(struct editor* e, unsigned int offset) {
 	// Calculate the minimum offset visible, and the maximum. If
 	// the requested offset is within that range, do not update
 	// the e->line yet (i.e. do not scroll).
-	int offset_min = e->line * e->octets_per_line;
-	int offset_max = offset_min + (e->screen_rows * e->octets_per_line);
+	unsigned int offset_min = e->line * e->octets_per_line;
+	unsigned int offset_max = offset_min + (e->screen_rows * e->octets_per_line);
 
 	if (offset >= offset_min && offset <= offset_max) {
 		// We're within range! Update the cursor position, but
@@ -330,7 +330,7 @@ void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct c
 	// differently from the rest.
 	if (rownum == e->cursor_y) {
 		// Check the cursor position on the x axis
-		for (int i = 0; i < strlen(asc); i++) {
+		for (int i = 0; i < (int) strlen(asc); i++) {
 			char x[1];
 			if (i+1 == e->cursor_x) {
 				// Highlight by 'inverting' the color
@@ -370,7 +370,7 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	// start_offset is to determine where we should start reading from
 	// the buffer. This is dependent on where the cursor is, and on the
 	// octets which are visible per line.
-	int start_offset = e->line * e->octets_per_line;
+	unsigned int start_offset = e->line * e->octets_per_line;
 	if (start_offset >= e->content_length) {
 		start_offset = e->content_length - e->octets_per_line;
 	}
@@ -379,17 +379,17 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	// to be displayed 'per screen'. I.e. if you can only display 1024
 	// bytes, you only have to read a maximum of 1024 bytes.
 	int bytes_per_screen = e->screen_rows * e->octets_per_line;
-	int end_offset = bytes_per_screen + start_offset - e->octets_per_line;
+	unsigned int end_offset = bytes_per_screen + start_offset - e->octets_per_line;
 	if (end_offset > e->content_length) {
 		end_offset = e->content_length;
 	}
 
-	int offset;
+	unsigned int offset;
 	int row = 0;
 	for (offset = start_offset; offset < end_offset; offset++) {
 		if (offset % e->octets_per_line == 0) {
 			// start of a new row, beginning with an offset address in hex.
-			charbuf_appendf(b, "\x1b[0;33m%09x\e[0m:", offset);
+			charbuf_appendf(b, "\x1b[0;33m%09x\x1b[0m:", offset);
 			// Initialize the ascii buffer to all zeroes, and reset the row char count.
 			memset(asc, '\0', sizeof(asc));
 			row_char_count = 0;
@@ -750,7 +750,7 @@ int editor_read_string(struct editor* e, char* dst, int len) {
 
 	// Safety guard. Our inputbuffer size is limited so stop
 	// incrementing our buffer index after this maximum.
-	if (e->inputbuffer_index >= sizeof(e->inputbuffer)) {
+	if ((size_t) e->inputbuffer_index >= sizeof(e->inputbuffer)) {
 		return c;
 	}
 
