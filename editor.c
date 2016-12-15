@@ -176,6 +176,8 @@ void editor_cursor_at_offset(struct editor* e, int offset, int* x, int* y) {
 
 void editor_delete_char_at_cursor(struct editor* e) {
 	unsigned int offset = editor_offset_at_cursor(e);
+	if (e->contents == NULL) return; /* file is empty */
+	
 	unsigned char charat = e->contents[offset];
 	int old_length = e->content_length;
 
@@ -184,7 +186,6 @@ void editor_delete_char_at_cursor(struct editor* e) {
 		return;
 	}
 
-	// FIXME: when all chars have been removed from a file, this blows up.
 	editor_delete_char_at_offset(e, offset);
 	e->dirty = true;
 
