@@ -14,8 +14,8 @@ all: hx hx.1.gz
 # Make use of implicit rules to build the hx binary.
 hx: $(objects)
 
-hx.1.gz: hx.1
-	gzip -k hx.1
+%.gz: %
+	gzip -k $<
 
 .PHONY: install
 install: all
