@@ -28,12 +28,6 @@ install: all
 	install -s ./hx /usr/bin
 	install ./hx.1.gz /usr/share/man/man1
 
-.PHONY: uninstall
-uninstall:
-	@[ `id -u` = 0 ] || { echo "Root required to uninstall."; exit 1; }
-	rm /usr/bin/hx
-	rm /usr/share/man/man1/hx.1.gz
-
 .PHONY: clean
 clean:
 	rm -f *.o hx.1.gz hx
