@@ -35,6 +35,6 @@ install: all
 
 .PHONY: clean
 clean:
-	$(RM) *.o *.d hx.1.gz hx
+	$(RM) $(objects) $(objects:.o=.d) hx.1.gz hx
 
 -include $(objects:.o=.d)
