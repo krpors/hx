@@ -13,8 +13,10 @@
 // Key enumeration, returned by read_key().
 enum key_codes {
 	KEY_NULL      = 0,
+	KEY_CTRL_D    = 0x04,
 	KEY_CTRL_Q    = 0x11, // DC1, to exit the program.
 	KEY_CTRL_S    = 0x13, // DC2, to save the current buffer.
+	KEY_CTRL_U    = 0x15,
 	KEY_ESC       = 0x1b, // ESC, for things like keys up, down, left, right, delete, ...
 	KEY_ENTER     = 0x0d,
 	KEY_BACKSPACE = 0x7f,
