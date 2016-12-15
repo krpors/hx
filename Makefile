@@ -2,7 +2,8 @@
 hx_git_hash := $(shell git rev-parse --verify HEAD --short=12)
 
 # __BSD_VISIBLE for SIGWINCH on FreeBSD.
-CFLAGS=-std=c99 -Wall -Wextra -Wpedantic -O3 -ggdb -DNDEBUG -D__BSD_VISIBLE -DHX_GIT_HASH=\"$(hx_git_hash)\"
+CFLAGS=-std=c99 -Wall -Wextra -Wpedantic -O3 -ggdb -DNDEBUG -D__BSD_VISIBLE -MMD -MP \
+       -DHX_GIT_HASH=\"$(hx_git_hash)\"
 LDFLAGS = -O3 -ggdb
 
 objects=hx.o editor.o charbuf.o util.o undo.o
@@ -12,12 +13,6 @@ all: hx hx.1.gz
 
 # Make use of implicit rules to build the hx binary.
 hx: $(objects)
-
-hx.o: editor.h util.h undo.h
-editor.o: editor.h util.h undo.h
-charbuf.o: charbuf.h
-util.o: util.h
-undo.o: undo.h
 
 hx.1.gz: hx.1
 	gzip -k hx.1
@@ -29,4 +24,6 @@ install: all
 
 .PHONY: clean
 clean:
-	$(RM) *.o hx.1.gz hx
+	$(RM) *.o *.d hx.1.gz hx
+
+-include $(objects:.o=.d)
