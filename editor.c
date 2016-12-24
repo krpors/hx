@@ -565,7 +565,7 @@ void editor_insert_byte_at_offset(struct editor* e, unsigned int offset, char x,
 	// this extra byte.
 	e->contents = realloc(e->contents, e->content_length + 1);
 
-	if (after) {
+	if (after && e->content_length) { // append is the same as insert when buffer is empty
 		offset++;
 	}
 	//          v
