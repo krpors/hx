@@ -32,6 +32,9 @@
 *.dSYM/
 *.su
 
+# Dependency files
+*.d
+
 # Others
 Session.vim
 hx

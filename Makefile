@@ -1,39 +1,34 @@
-# Read the version of the current commit.
-hx_git_hash := $(shell git rev-parse --verify HEAD --short=12)
+hx_git_hash != git rev-parse --verify HEAD --short=12
+hx_version != git describe --tags 2>/dev/null || echo "1.0.0"
 
-# __BSD_VISIBLE for SIGWINCH on FreeBSD.
-CFLAGS=-std=c99 -Wall -Wextra -Wpedantic -O3 -ggdb -DNDEBUG -D__BSD_VISIBLE -DHX_GIT_HASH=\"$(hx_git_hash)\"
+CPPFLAGS = -DNDEBUG -DHX_GIT_HASH=\"$(hx_git_hash)\" -DHX_VERSION=\"$(hx_version)\"
+CPPFLAGS += -D__BSD_VISIBLE # SIGWINCH on FreeBSD.
+CFLAGS = -std=c99 -Wall -Wextra -Wpedantic -O3 -MMD -MP
+LDFLAGS = -O3
 
-objects=main.o editor.o charbuf.o util.o undo.o
+objects := hx.o editor.o charbuf.o util.o undo.o
 
-# Make use of implicit rules to build the hx binary.
-hx: $(objects)
-	$(CC) -o $@ $(CFLAGS) $(objects)
+PREFIX ?= /usr/local
+bindir = /bin
+mandir = /man
 
-main.o: charbuf.o util.o undo.o editor.o
-editor.o: editor.h charbuf.o util.o undo.o
-charbuf.o: charbuf.h
-util.o: util.h
-undo.o: undo.h
+%.gz: %
+	gzip -k $<
 
-hx.1.gz: hx.1
-	gzip -k hx.1
-
-.PHONY: all
 all: hx hx.1.gz
+hx: $(objects)
 
-.PHONY: install
+debug: all
+debug: CFLAGS += -ggdb -Og
+debug: LDFLAGS += -ggdb -Og
+
 install: all
-	@[ `id -u` = 0 ] || { echo "Root required to install."; exit 1; }
-	install -s ./hx /usr/bin
-	install ./hx.1.gz /usr/share/man/man1
+	install -Dm755 -s ./hx -t $(DESTDIR)$(PREFIX)$(bindir)
+	install -Dm644 ./hx.1.gz -t $(DESTDIR)$(PREFIX)$(mandir)/man1
 
-.PHONY: uninstall
-uninstall:
-	@[ `id -u` = 0 ] || { echo "Root required to uninstall."; exit 1; }
-	rm /usr/bin/hx
-	rm /usr/share/man/man1/hx.1.gz
-
-.PHONY: clean
 clean:
-	rm -f *.o hx.1.gz hx
+	$(RM) $(objects) $(objects:.o=.d) hx.1.gz hx
+
+-include $(objects:.o=.d)
+
+.PHONY: all debug install clean
