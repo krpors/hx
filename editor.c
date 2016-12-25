@@ -92,11 +92,21 @@ void editor_move_cursor(struct editor* e, int dir, int amount) {
 	}
 }
 
+void editor_newfile(struct editor* e, const char* filename) {
+	e->filename = malloc(strlen(filename) + 1);
+	strncpy(e->filename, filename, strlen(filename) + 1);
+	e->contents = malloc(0);
+	e->content_length = 0;
+}
+
 void editor_openfile(struct editor* e, const char* filename) {
 	FILE* fp = fopen(filename, "rb");
 	if (fp == NULL) {
-		fprintf(stderr, "Cannot open file '%s': %s\n", filename, strerror(errno));
-		exit(1);
+		if (errno == ENOENT) {
+			// file does not exist, open it as a new file and return.
+			editor_newfile(e, filename);
+			return;
+		}
 	}
 
 	// stat() the file.
@@ -112,13 +122,6 @@ void editor_openfile(struct editor* e, const char* filename) {
 		exit(1);
 	}
 
-	if (statbuf.st_size <= 0) {
-		// TODO: file size is empty, then what?
-		printf("File is empty.\n");
-		fflush(stdout);
-		exit(0);
-	}
-
 	// allocate memory for the buffer. No need for extra
 	// room for a null string terminator, since we're possibly
 	// reading binary data only anyway (which can contain 0x00).
@@ -130,7 +133,7 @@ void editor_openfile(struct editor* e, const char* filename) {
 		exit(1);
 	}
 
-	// duplicate string without using gnu99 strdup().
+	 // duplicate string without using gnu99 strdup().
 	e->filename = malloc(strlen(filename) + 1);
 	strncpy(e->filename, filename, strlen(filename) + 1);
 	e->contents = contents;
@@ -182,7 +185,7 @@ void editor_delete_char_at_cursor(struct editor* e) {
 		editor_statusmessage(e, STATUS_WARNING, "Nothing to delete");
 		return;
 	}
-	
+
 	unsigned char charat = e->contents[offset];
 	editor_delete_char_at_offset(e, offset);
 	e->dirty = true;
@@ -354,7 +357,7 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	if (e->content_length <= 0) {
 		// TODO: handle this in a better way.
 		charbuf_append(b, "\x1b[2J", 4);
-		charbuf_append(b, "empty", 5);
+		charbuf_appendf(b, "File is empty. Use 'i' to insert a hexadecimal value.");
 		return;
 	}
 
@@ -530,7 +533,11 @@ void editor_refresh_screen(struct editor* e) {
 		int curx = (e->cursor_x - 1) * 2; // times 2 characters to represent a byte in hex
 		int spaces = curx / (e->grouping * 2); // determine spaces to add due to grouping.
 		int cruft = curx + spaces + 12; // 12 = the size of the address + ": "
-		charbuf_appendf(b, "\x1b[%d;%dH", e->cursor_y, cruft);
+		if (e->content_length > 0) {
+			// Only position the cursor properly when there's content to display.
+			// Without content, ignore placing the cursor properly.
+			charbuf_appendf(b, "\x1b[%d;%dH", e->cursor_y, cruft);
+		}
 	} else if (e->mode & MODE_COMMAND) {
 		// When in command mode, handle rendering different. For instance,
 		// the cursor is placed at the bottom. Ruler is not required.
@@ -783,10 +790,14 @@ void editor_process_keypress(struct editor* e) {
 
 	if (e->mode & MODE_REPLACE) {
 		char out = 0;
-		if (editor_read_hex_input(e, &out) != -1) {
-			editor_replace_byte(e, out);
+		if (e->content_length > 0) {
+			if (editor_read_hex_input(e, &out) != -1) {
+				editor_replace_byte(e, out);
+			}
+			return;
+		} else {
+			editor_statusmessage(e, STATUS_ERROR, "File is empty, nothing to replace");
 		}
-		return;
 	}
 
 	if (e->mode & MODE_COMMAND) {
