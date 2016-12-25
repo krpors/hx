@@ -41,13 +41,13 @@ int  read_key();
 int  hex2bin(const char* s);
 bool get_window_size(int* rows, int* cols);
 
-/**
+/*
  * Returns true when the given char can be successfully parsed as a positive
  * integer, or return false if otherwise.
  */
 bool is_pos_num(const char* s);
 
-/**
+/*
  * Returns true when the given string is a valid hexadecimal string, or false
  * if othwerise.
  */
@@ -55,14 +55,14 @@ bool is_hex(const char* s);
 
 int hex2int(const char* s);
 
-/**
+/*
  * Clamps the given integer i to the given min or max. If i is smaller than
  * min, min is returned. If i is larger than max, max is returned. In all
  * other cases, i is returned.
  */
 int clampi(int i, int min, int max);
 
-/**
+/*
  * Parses a string to an integer and returns it. In case of errors, the default
  * `def' will be returned. When the `min' > parsed_value > `max', then the
  * default `def' will also be returned.

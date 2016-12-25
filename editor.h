@@ -11,7 +11,7 @@
 
 #include <stdbool.h>
 
-/**
+/*
  * Mode the editor can be in.
  */
 enum editor_mode {
@@ -23,7 +23,7 @@ enum editor_mode {
 	MODE_SEARCH  = 0x20, // search mode.
 };
 
-/**
+/*
  * Search directions.
  */
 enum search_direction {
@@ -31,7 +31,7 @@ enum search_direction {
 	SEARCH_BACKWARD,
 };
 
-/**
+/*
  * Current status severity.
  */
 enum status_severity {
@@ -42,7 +42,7 @@ enum status_severity {
 
 #define INPUT_BUF_SIZE 80
 
-/**
+/*
  * This struct contains internal information of the state of the editor.
  */
 struct editor {
@@ -74,12 +74,12 @@ struct editor {
 	struct action_list* undo_list; // tail of the list
 };
 
-/**
+/*
  * Initializes the editor struct with basic values.
  */
 struct editor* editor_init();
 
-/**
+/*
  * Finds the cursor position at the given offset, taking the lines into account.
  * The result is set to the pointers `x' and `y'. We can therefore 'misuse' this
  * to set the cursor position of the editor to a given offset.
@@ -88,7 +88,7 @@ struct editor* editor_init();
  */
 void editor_cursor_at_offset(struct editor* e, int offset, int* x, int *y);
 
-/**
+/*
  * Deletes the character (byte) at the current cursor position (in other
  * words, the current offset the cursor is at).
  */
@@ -99,19 +99,19 @@ void editor_delete_char_at_offset(struct editor* e, unsigned int offset);
 void editor_free(struct editor* e);
 void editor_increment_byte(struct editor* e, int amount);
 
-/**
+/*
  * Inserts the character byte at the current offset, or after the current
  * offset if `after' is set to true.
  */
 void editor_insert_byte(struct editor* e, char x, bool after);
 
-/**
+/*
  * Inserts the character byte at the given offset, or after the given offset if
  * `after' is set to true.
  */
 void editor_insert_byte_at_offset(struct editor* e, unsigned int offset, char x, bool after);
 
-/**
+/*
  * Moves the cursor. The terminal cursor positions are all 1-based, so we
  * take that into account. When we scroll past boundaries (left, right, up
  * and down) we react accordingly. Note that the cursor_x/y are also 1-based,
@@ -120,42 +120,42 @@ void editor_insert_byte_at_offset(struct editor* e, unsigned int offset, char x,
  */
 void editor_move_cursor(struct editor* e, int dir, int amount);
 
-/**
+/*
  * Gets the current offset at which the cursor is.
  */
 int editor_offset_at_cursor(struct editor* e);
 
-/**
+/*
  * Opens a file denoted by `filename', or exit if the file cannot be opened.
  * The editor struct is used to contain the contents and other metadata
  * about the file being opened.
  */
 void editor_openfile(struct editor* e, const char* filename);
 
-/**
+/*
  * Processes a manual command input when the editor mode is set
  * to MODE_COMMAND.
  */
 void editor_process_command(struct editor* e, const char* cmd);
 
-/**
+/*
  * Processes a search string.
  */
 void editor_process_search(struct editor* e, const char* str, enum search_direction dir);
 
-/**
+/*
  * Processes a keypress accordingly.
  */
 void editor_process_keypress(struct editor* e);
 
-/**
+/*
  * This function is looped while in REPLACE mode until two valid hex characters
  * are read from the user. The result is placed in the char pointed to by `out'.
  * `output' is therefore not a string, but a pointer to a single char!
  */
 int editor_read_hex_input(struct editor* e, char* output);
 
-/**
+/*
  * 'Generic' function to read an input string (such as a command or
  * a search string). An internal buffer 'inputbuffer' is filled, purely
  * for displaying purposes. The actual result will be placed in the
@@ -163,7 +163,7 @@ int editor_read_hex_input(struct editor* e, char* output);
  */
 int editor_read_string(struct editor* e, char* dst, int len);
 
-/**
+/*
  * Renders the given ASCII string, `asc' to the buffer `b'. The `rownum'
  * specified should be the row number being rendered in an iteration in
  * editor_render_contents. This function will render the selected byte
@@ -172,7 +172,7 @@ int editor_read_string(struct editor* e, char* dst, int len);
  */
 void editor_render_ascii(struct editor* e, int rownum, const char* ascii, struct charbuf* b);
 
-/**
+/*
  * Renders the contents of the current state of the editor `e'
  * to the buffer `b'.
  */
@@ -185,35 +185,35 @@ void editor_render_contents(struct editor* e, struct charbuf* b);
  */
 void editor_render_ruler(struct editor* e, struct charbuf* buf);
 
-/**
+/*
  * Renders the status line to the buffer `b'.
  */
 void editor_render_status(struct editor* e, struct charbuf* buf);
 
-/**
+/*
  * Refreshes the screen. It uses a temporary buffer to write everything that's
  * eligible for display to an internal buffer, and then 'draws' it to the screen
  * in one call.
  */
 void editor_refresh_screen(struct editor* e);
 
-/**
+/*
  * Replaces the byte(char) at the current selected offset with the given char.
  */
 void editor_replace_byte(struct editor* e, char x);
 
-/**
+/*
  * Replaces a byte(char) `x' at the given `offset'.
  */
 void editor_replace_byte_at_offset(struct editor* e, unsigned int offset, char x);
 
-/**
+/*
  * Scrolls the editor by updating the `line' accordingly, within
  * the bounds of the readable parts of the buffer.
  */
 void editor_scroll(struct editor* e, int units);
 
-/**
+/*
  * Scrolls the editor to a particular given offset. The given offset
  * can be given any value, the function will limit it to the upper and
  * lower bounds of what can be displayed.
@@ -222,22 +222,22 @@ void editor_scroll(struct editor* e, int units);
  */
 void editor_scroll_to_offset(struct editor* e, unsigned int offset);
 
-/**
+/*
  * Sets editor to mode to one of the modes defined in the enum.
  */
 void editor_setmode(struct editor *e, enum editor_mode mode);
 
-/**
+/*
  * Sets statusmessage, including color depending on severity.
  */
 int editor_statusmessage(struct editor* e, enum status_severity s, const char* fmt, ...);
 
-/**
+/*
  * Undoes an action.
  */
 void editor_undo(struct editor* e);
 
-/**
+/*
  * Writes the contents of the editor's buffer the to the same filename.
  */
 void editor_writefile(struct editor* e);

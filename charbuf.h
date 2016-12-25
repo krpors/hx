@@ -11,7 +11,7 @@
 
 static const int CHARBUF_APPENDF_SIZE = 1024;
 
-/**
+/*
  * This charbuf contains the character sequences to render the current
  * 'screen'. The charbuf is changed as a whole, then written to the screen
  * in one go to prevent 'flickering' in the terminal. The charbuf behaves
@@ -23,22 +23,22 @@ struct charbuf {
 	int cap;        // capacity
 };
 
-/**
+/*
  * Create a charbuf on the heap and return it.
  */
 struct charbuf* charbuf_create();
 
-/**
+/*
  * Deletes the charbuf's contents, and the charbuf itself.
  */
 void charbuf_free(struct charbuf* buf);
 
-/**
+/*
  * Appends `what' to the charbuf, writing exactly `len' bytes.
  */
 void charbuf_append(struct charbuf* buf, const char* what, size_t len);
 
-/**
+/*
  * Appends `what' to the charbuf, which can be a formatted string
  * processed by `vsnprintf'. If you know beforehand what size you
  * need to append to the charbuf, use charbuf_append instead.
@@ -48,7 +48,7 @@ void charbuf_append(struct charbuf* buf, const char* what, size_t len);
  */
 int charbuf_appendf(struct charbuf* buf, const char* what, ...);
 
-/**
+/*
  * Draws (writes) the charbuf to the screen.
  */
 void charbuf_draw(struct charbuf* buf);
