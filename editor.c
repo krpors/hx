@@ -304,10 +304,11 @@ void editor_scroll_to_offset(struct editor* e, unsigned int offset) {
 void editor_setmode(struct editor* e, enum editor_mode mode) {
 	e->mode = mode;
 	switch (e->mode) {
-	case MODE_NORMAL:  editor_statusmessage(e, STATUS_INFO, ""); break;
-	case MODE_APPEND:  editor_statusmessage(e, STATUS_INFO, "-- APPEND -- "); break;
-	case MODE_INSERT:  editor_statusmessage(e, STATUS_INFO, "-- INSERT --"); break;
-	case MODE_REPLACE: editor_statusmessage(e, STATUS_INFO, "-- REPLACE --"); break;
+	case MODE_NORMAL:        editor_statusmessage(e, STATUS_INFO, ""); break;
+	case MODE_APPEND:        editor_statusmessage(e, STATUS_INFO, "-- APPEND -- "); break;
+	case MODE_INSERT:        editor_statusmessage(e, STATUS_INFO, "-- INSERT --"); break;
+	case MODE_INSERT_ASCII:  editor_statusmessage(e, STATUS_INFO, "-- INSERT ASCII --"); break;
+	case MODE_REPLACE:       editor_statusmessage(e, STATUS_INFO, "-- REPLACE --"); break;
 	case MODE_COMMAND: break;
 	case MODE_SEARCH:  break;
 	}
@@ -519,7 +520,7 @@ void editor_refresh_screen(struct editor* e) {
 	charbuf_append(b, "\x1b[?25l", 6);
 	charbuf_append(b, "\x1b[H", 3); // move the cursor top left
 
-	if (e->mode & (MODE_REPLACE | MODE_NORMAL | MODE_APPEND | MODE_INSERT)) {
+	if (e->mode & (MODE_REPLACE | MODE_NORMAL | MODE_APPEND | MODE_INSERT | MODE_INSERT_ASCII)) {
 		editor_render_contents(e, b);
 		editor_render_status(e, b);
 
@@ -788,6 +789,17 @@ void editor_process_keypress(struct editor* e) {
 		return;
 	}
 
+	// Insert 'literal' ASCII values.
+	if (e->mode & (MODE_INSERT_ASCII)) {
+		char c = read_key();
+		if (c == KEY_ESC) {
+			editor_setmode(e, MODE_NORMAL); return;
+		}
+		editor_insert_byte(e, c, false);
+		editor_move_cursor(e, KEY_RIGHT, 1);
+		return;
+	}
+
 	if (e->mode & MODE_REPLACE) {
 		char out = 0;
 		if (e->content_length > 0) {
@@ -853,11 +865,12 @@ void editor_process_keypress(struct editor* e) {
 		case 'n': editor_process_search(e, e->searchstr, SEARCH_FORWARD); break;
 		case 'N': editor_process_search(e, e->searchstr, SEARCH_BACKWARD); break;
 
-		case 'a': editor_setmode(e, MODE_APPEND);  return;
-		case 'i': editor_setmode(e, MODE_INSERT);  return;
-		case 'r': editor_setmode(e, MODE_REPLACE); return;
-		case ':': editor_setmode(e, MODE_COMMAND); return;
-		case '/': editor_setmode(e, MODE_SEARCH);  return;
+		case 'a': editor_setmode(e, MODE_APPEND);       return;
+		case 'i': editor_setmode(e, MODE_INSERT);       return;
+		case 'I': editor_setmode(e, MODE_INSERT_ASCII); return;
+		case 'r': editor_setmode(e, MODE_REPLACE);      return;
+		case ':': editor_setmode(e, MODE_COMMAND);      return;
+		case '/': editor_setmode(e, MODE_SEARCH);       return;
 
 		case 'u': editor_undo(e); return;
 
