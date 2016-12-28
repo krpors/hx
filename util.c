@@ -141,6 +141,11 @@ int read_key() {
 					case '4': return KEY_END;
 					case '5': return KEY_PAGEUP;
 					case '6': return KEY_PAGEDOWN;
+					// TODO: with rxvt-unicode, ^[[7~ and ^[[8~ seem to be
+					// emitted when the home/end key are pressed. We can
+					// currently mitigate it like this.
+					case '7': return KEY_HOME;
+					case '8': return KEY_END;
 					}
 				}
 			}
@@ -152,8 +157,14 @@ int read_key() {
 			case 'H': return KEY_HOME; // does not work with me?
 			case 'F': return KEY_END;  // ... same?
 			}
+		} else if (seq[0] == 'O') {
+			// Some terminal emulators emit ^[[O sequences for HOME/END,
+			// such as xfce4-terminal.
+			switch (seq[1]) {
+			case 'H': return KEY_HOME;
+			case 'F': return KEY_END;
+			}
 		}
-		break;
 	}
 
 	return c;

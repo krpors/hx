@@ -79,6 +79,8 @@ static void print_version() {
 }
 
 #if 0
+#include <unistd.h>
+#include <ctype.h>
 void debug_keypress() {
 	char c;
 	ssize_t nread;
