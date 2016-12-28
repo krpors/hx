@@ -39,7 +39,9 @@ Keys which can be used:
 	u       : Undo the last action.
 
 	a       : Append mode. Appends a byte after the current cursor position.
+	A       : Append mode. Appends the literal typed keys (except ESC).
 	i       : Insert mode. Inserts a byte at the current cursor position.
+	I       : Insert mode. Inserts the literal typed keys (except ESC).
 	r       : Replace mode. Replaces the byte at the current cursor position.
 	:       : Command mode. Commands can be typed and executed (see below).
 	ESC     : Return to normal mode.
@@ -58,6 +60,9 @@ mode where manual commands can be typed. The following commands are recognized c
 
 * `:123`      : go to offset 123 (base 10)
 * `:0x7a69`   : go to offset 0x7a69 (base 16), 31337 in base 10.
+* `w`         : writes the file.
+* `q`         : quits (will warn if the buffer is dirty).
+* `q!`        : quits promptly without warning.
 
 Input is very basic. Cursor movement is not available. Only backspace/enter.
 

@@ -109,7 +109,11 @@ u          : undo the last action, until the undo stack is empty.
 .It
 a          : enable APPEND mode.
 .It
+A          : enable APPEND-ASCII mode.
+.It
 i          : enable INSERT mode.
+.It
+I          : enable INSERT-ASCII mode.
 .It
 r          : enable REPLACE mode.
 .It
@@ -131,14 +135,20 @@ In append-mode, the editor appends a byte value one position after the current
 selected offset. To go into append mode, type 'a' when in normal-mode. Two valid
 hexadecimal characters need to be typed to append that byte value. For instance,
 type '6' followed by '5' to append the hex value '0x65' (which is ASCII 'e').
+.Ss APPEND-ASCII
+Same as the APPEND mode, except everything that is typed on the keyboard will be
+appended.
 .Ss INSERT
 In insert-mode, the editor inserts a byte value at the current offset. Use 'i'
 when in normal-mode to switch to insert-mode.
+.Ss INSERT-ASCII
+Same as the INSERT mode, except everything that is typed on the keyboard will be
+inserted.
 .Ss REPLACE
 In replace-mode, the editor replaces the current byte at the current offset with
 a byte of choice. Use 'r' when in normal-mode to switch to replace-mode.
 .Ss COMMAND
-In command-mode, manual commands can be entered This can be triggered by typing 
+In command-mode, manual commands can be entered. This can be triggered by typing 
 the colon (
 .Sy :
 ) character. The cursor will move to the bottom where there's space to type
