@@ -306,6 +306,7 @@ void editor_setmode(struct editor* e, enum editor_mode mode) {
 	switch (e->mode) {
 	case MODE_NORMAL:        editor_statusmessage(e, STATUS_INFO, ""); break;
 	case MODE_APPEND:        editor_statusmessage(e, STATUS_INFO, "-- APPEND -- "); break;
+	case MODE_APPEND_ASCII:  editor_statusmessage(e, STATUS_INFO, "-- APPEND ASCII --"); break;
 	case MODE_INSERT:        editor_statusmessage(e, STATUS_INFO, "-- INSERT --"); break;
 	case MODE_INSERT_ASCII:  editor_statusmessage(e, STATUS_INFO, "-- INSERT ASCII --"); break;
 	case MODE_REPLACE:       editor_statusmessage(e, STATUS_INFO, "-- REPLACE --"); break;
@@ -520,7 +521,14 @@ void editor_refresh_screen(struct editor* e) {
 	charbuf_append(b, "\x1b[?25l", 6);
 	charbuf_append(b, "\x1b[H", 3); // move the cursor top left
 
-	if (e->mode & (MODE_REPLACE | MODE_NORMAL | MODE_APPEND | MODE_INSERT | MODE_INSERT_ASCII)) {
+	if (e->mode &
+			(MODE_REPLACE |
+			 MODE_NORMAL |
+			 MODE_APPEND |
+			 MODE_APPEND_ASCII |
+			 MODE_INSERT |
+			 MODE_INSERT_ASCII)) {
+
 		editor_render_contents(e, b);
 		editor_render_status(e, b);
 
@@ -789,13 +797,13 @@ void editor_process_keypress(struct editor* e) {
 		return;
 	}
 
-	// Insert 'literal' ASCII values.
-	if (e->mode & (MODE_INSERT_ASCII)) {
+	// Append or insert 'literal' ASCII values.
+	if (e->mode & (MODE_INSERT_ASCII | MODE_APPEND_ASCII)) {
 		char c = read_key();
 		if (c == KEY_ESC) {
 			editor_setmode(e, MODE_NORMAL); return;
 		}
-		editor_insert_byte(e, c, false);
+		editor_insert_byte(e, c, e->mode & MODE_APPEND_ASCII);
 		editor_move_cursor(e, KEY_RIGHT, 1);
 		return;
 	}
@@ -866,6 +874,7 @@ void editor_process_keypress(struct editor* e) {
 		case 'N': editor_process_search(e, e->searchstr, SEARCH_BACKWARD); break;
 
 		case 'a': editor_setmode(e, MODE_APPEND);       return;
+		case 'A': editor_setmode(e, MODE_APPEND_ASCII); return;
 		case 'i': editor_setmode(e, MODE_INSERT);       return;
 		case 'I': editor_setmode(e, MODE_INSERT_ASCII); return;
 		case 'r': editor_setmode(e, MODE_REPLACE);      return;

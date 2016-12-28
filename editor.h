@@ -15,13 +15,14 @@
  * Mode the editor can be in.
  */
 enum editor_mode {
-	MODE_APPEND       = 0x01, // append value after the current cursor position.
-	MODE_NORMAL       = 0x02, // normal mode i.e. for navigating, commands.
-	MODE_INSERT       = 0x04, // insert values at cursor position.
-	MODE_INSERT_ASCII = 0x08, // insert literal typed value at cursor position.
-	MODE_REPLACE      = 0x10, // replace values at cursor position.
-	MODE_COMMAND      = 0x20, // command input mode.
-	MODE_SEARCH       = 0x40, // search mode.
+	MODE_APPEND       = 0x001, // append value after the current cursor position.
+	MODE_APPEND_ASCII = 0x002, // append literal typed value after the current cursor position.
+	MODE_NORMAL       = 0x004, // normal mode i.e. for navigating, commands.
+	MODE_INSERT       = 0x008, // insert values at cursor position.
+	MODE_INSERT_ASCII = 0x010, // insert literal typed value at cursor position.
+	MODE_REPLACE      = 0x020, // replace values at cursor position.
+	MODE_COMMAND      = 0x040, // command input mode.
+	MODE_SEARCH       = 0x100, // search mode.
 };
 
 /*
