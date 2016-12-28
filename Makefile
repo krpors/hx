@@ -3,7 +3,7 @@ hx_version != git describe --tags 2>/dev/null || echo "1.0.0"
 
 CPPFLAGS = -DNDEBUG -DHX_GIT_HASH=\"$(hx_git_hash)\" -DHX_VERSION=\"$(hx_version)\"
 CPPFLAGS += -D__BSD_VISIBLE # SIGWINCH on FreeBSD.
-CFLAGS = -std=c99 -Wall -Wextra -Wpedantic -O3 -MMD -MP
+CFLAGS = -std=c99 -Wall -Wextra -pedantic -O3 -MMD -MP
 LDFLAGS = -O3
 
 objects := hx.o editor.o charbuf.o util.o undo.o
