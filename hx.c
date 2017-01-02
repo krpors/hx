@@ -4,9 +4,6 @@
  * Copyright (c) 2016 Kevin Pors. See LICENSE for details.
  */
 
-// Define _POSIX_SOURCE to enable sigaction(). See `man 2 sigaction'
-#define _POSIX_SOURCE
-
 // Needed for Apple clang to recognize SIGWINCH
 #ifdef __APPLE__
 #define _DARWIN_C_SOURCE

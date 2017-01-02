@@ -2,6 +2,7 @@ hx_git_hash != git rev-parse --verify HEAD --short=12
 hx_version != git describe --tags 2>/dev/null || echo "1.0.0"
 
 CPPFLAGS = -DNDEBUG -DHX_GIT_HASH=\"$(hx_git_hash)\" -DHX_VERSION=\"$(hx_version)\"
+CPPFLAGS += -D_POSIX_SOURCE # sigaction
 CPPFLAGS += -D__BSD_VISIBLE # SIGWINCH on FreeBSD.
 CFLAGS = -std=c99 -Wall -Wextra -pedantic -O3 -MMD -MP
 LDFLAGS = -O3
@@ -19,6 +20,7 @@ all: hx hx.1.gz
 hx: $(objects)
 
 debug: all
+debug: CPPFLAGS += -UNDEBUG # undefine the NDEBUG flag to allow assert().
 debug: CFLAGS += -ggdb -Og
 debug: LDFLAGS += -ggdb -Og
 

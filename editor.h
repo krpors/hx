@@ -99,6 +99,7 @@ void editor_delete_char_at_cursor(struct editor* e);
 void editor_delete_char_at_offset(struct editor* e, unsigned int offset);
 
 void editor_free(struct editor* e);
+
 void editor_increment_byte(struct editor* e, int amount);
 
 /*
@@ -179,6 +180,12 @@ void editor_render_ascii(struct editor* e, int rownum, const char* ascii, struct
  * to the buffer `b'.
  */
 void editor_render_contents(struct editor* e, struct charbuf* b);
+
+/*
+ * Renders on-line help on the screen. This is implemented without the
+ * usage of a MODE since the commands etc. are not applicable in this state.
+ */
+void editor_render_help(struct editor* e);
 
 /*
  * Renders a ruler at the bottom right part of the screen, containing

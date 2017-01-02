@@ -65,6 +65,7 @@ void charbuf_append(struct charbuf* buf, const char* what, size_t len) {
 }
 
 int charbuf_appendf(struct charbuf* buf, const char* fmt, ...) {
+	assert(strlen(fmt) < CHARBUF_APPENDF_SIZE);
 	// We use a fixed size buffer. We don't need to fmt a lot
 	// of characters anyway.
 	char buffer[CHARBUF_APPENDF_SIZE];

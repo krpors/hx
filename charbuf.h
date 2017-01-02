@@ -9,7 +9,7 @@
 #ifndef HX_CHARBUF_H
 #define HX_CHARBUF_H
 
-static const int CHARBUF_APPENDF_SIZE = 1024;
+static const unsigned int CHARBUF_APPENDF_SIZE = 1024;
 
 /*
  * This charbuf contains the character sequences to render the current

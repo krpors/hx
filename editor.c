@@ -210,7 +210,6 @@ void editor_delete_char_at_offset(struct editor* e, unsigned int offset) {
 
 }
 
-
 void editor_increment_byte(struct editor* e, int amount) {
 	unsigned int offset = editor_offset_at_cursor(e);
 	unsigned char prev = e->contents[offset];
@@ -357,7 +356,6 @@ void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct c
 
 void editor_render_contents(struct editor* e, struct charbuf* b) {
 	if (e->content_length <= 0) {
-		// TODO: handle this in a better way.
 		charbuf_append(b, "\x1b[2J", 4);
 		charbuf_appendf(b, "File is empty. Use 'i' to insert a hexadecimal value.");
 		return;
@@ -455,14 +453,60 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	charbuf_append(b, "\x1b[0K", 4);
 
 #ifndef NDEBUG
-	charbuf_appendf(b, "\e[0m\e[1;35m\e[1;80HRows: %d", e->screen_rows);
-	charbuf_appendf(b, "\e[0K\e[2;80HOffset: %09x - %09x", start_offset, end_offset);
-	charbuf_appendf(b, "\e[0K\e[3;80H(y,x)=(%d,%d)", e->cursor_y, e->cursor_x);
-	charbuf_appendf(b, "\e[0K\e[4;80HHex line width: %d", e->hex_line_width);
+	charbuf_appendf(b, "\x1b[0m\x1b[1;35m\x1b[1;80HRows: %d", e->screen_rows);
+	charbuf_appendf(b, "\x1b[0K\x1b[2;80HOffset: %09x - %09x", start_offset, end_offset);
+	charbuf_appendf(b, "\x1b[0K\x1b[3;80H(y,x)=(%d,%d)", e->cursor_y, e->cursor_x);
 	unsigned int curr_offset = editor_offset_at_cursor(e);
-	charbuf_appendf(b, "\e[0K\e[5;80H\e[0KLine: %d, cursor offset: %d (hex: %02x)", e->line, curr_offset, (unsigned char) e->contents[curr_offset]);
+	charbuf_appendf(b, "\x1b[0K\x1b[5;80H\x1b[0KLine: %d, cursor offset: %d (hex: %02x)", e->line, curr_offset, (unsigned char) e->contents[curr_offset]);
 #endif
 }
+
+void editor_render_help(struct editor* e) {
+	(void) e;
+	struct charbuf* b = charbuf_create();
+	clear_screen();
+	charbuf_append(b, "\x1b[?25l", 6); // hide cursor
+	charbuf_appendf(b, "This is hx, version %s\r\n\n", HX_VERSION);
+	charbuf_appendf(b,
+		"Available commands:\r\n"
+		"\r\n"
+		"CTRL+Q  : Quit immediately without saving.\r\n"
+		"CTRL+S  : Save (in place).\r\n"
+		"hjkl    : Vim like cursor movement.\r\n"
+		"Arrows  : Also moves the cursor around.\r\n"
+		"w       : Skip one group of bytes to the right.\r\n"
+		"b       : Skip one group of bytes to the left.\r\n"
+		"gg      : Move to start of file.\r\n"
+		"G       : Move to end of file.\r\n"
+		"x / DEL : Delete byte at cursor position.\r\n"
+		"/       : Start search input.\r\n"
+		"n       : Search for next occurrence.\r\n"
+		"N       : Search for previous occurrence.\r\n"
+		"u       : Undo the last action.\r\n"
+		"\r\n");
+	charbuf_appendf(b,
+		"a       : Append mode. Appends a byte after the current cursor position.\r\n"
+		"A       : Append mode. Appends the literal typed keys (except ESC).\r\n"
+		"i       : Insert mode. Inserts a byte at the current cursor position.\r\n"
+		"I       : Insert mode. Inserts the literal typed keys (except ESC).\r\n"
+		"r       : Replace mode. Replaces the byte at the current cursor position.\r\n"
+		":       : Command mode. Commands can be typed and executed.\r\n"
+		"ESC     : Return to normal mode.\r\n"
+		"]       : Increment byte at cursor position with 1.\r\n"
+		"[       : Decrement byte at cursor position with 1.\r\n"
+		"End     : Move cursor to end of the offset line.\r\n"
+		"Home    : Move cursor to the beginning of the offset line.\r\n"
+		"\r\n"
+	);
+	charbuf_appendf(b,
+		"Press any key to exit help.\r\n");
+
+	charbuf_draw(b);
+
+	read_key();
+	clear_screen();
+}
+
 
 
 void editor_render_ruler(struct editor* e, struct charbuf* b) {
@@ -650,6 +694,11 @@ void editor_process_command(struct editor* e, const char* cmd) {
 
 	if (strncmp(cmd, "q!", INPUT_BUF_SIZE) == 0) {
 		exit(0);
+		return;
+	}
+
+	if (strncmp(cmd, "help", INPUT_BUF_SIZE) == 0) {
+		editor_render_help(e);
 		return;
 	}
 

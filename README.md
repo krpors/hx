@@ -24,7 +24,7 @@ Running `hx`:
 
 Keys which can be used:
 
-    CTRL+Q  : Quit immediately without saving.
+	CTRL+Q  : Quit immediately without saving.
 	CTRL+S  : Save (in place).
 	hjkl    : Vim like cursor movement.
 	Arrows  : Also moves the cursor around.
