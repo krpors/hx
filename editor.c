@@ -122,22 +122,48 @@ void editor_openfile(struct editor* e, const char* filename) {
 		exit(1);
 	}
 
-	// allocate memory for the buffer. No need for extra
-	// room for a null string terminator, since we're possibly
-	// reading binary data only anyway (which can contain 0x00).
-	char* contents = malloc(sizeof(char) * statbuf.st_size);
+	// The content buffer. When stat() returns a non-zero length, this will
+	// be malloc'd. When <= 0, this will be assigned via a charbuf. This
+	// branching is done because 1) Otherwise /proc/ cannot be read, and 2)
+	// reading a large file just with fgetc() imposes a major negative performance
+	// impact.
+	char* contents;
+	int content_length = 0;
 
-	if (fread(contents, 1, statbuf.st_size, fp) < (size_t) statbuf.st_size) {
-		perror("Unable to read file contents");
-		free(contents);
-		exit(1);
+	if (statbuf.st_size <= 0) {
+		// The stat() returned a (less than) zero size length. This may be
+		// because the user is trying to read a file from /proc/. In that
+		// case, read the data per-byte until EOF.
+		struct charbuf* buf = charbuf_create();
+		int c;
+		char tempbuf[1];
+		while ((c = fgetc(fp)) != EOF) {
+			tempbuf[0] = (char) c;
+			charbuf_append(buf, tempbuf, 1);
+		}
+		// Point contents to the charbuf's contents and set the length accordingly.
+		contents = buf->contents;
+		content_length = buf->len;
+	} else {
+		// stat() returned a size we can work with. Allocate memory for the
+		// buffer, No need for extra room for a null string terminator, since
+		// we're possibly reading binary data only anyway (which can contain 0x00).
+		contents = malloc(sizeof(char) * statbuf.st_size);
+		content_length = statbuf.st_size;
+
+		// fread() has a massive performance improvement when reading large files.
+		if (fread(contents, 1, statbuf.st_size, fp) < (size_t) statbuf.st_size) {
+			perror("Unable to read file contents");
+			free(contents);
+			exit(1);
+		}
 	}
 
 	 // duplicate string without using gnu99 strdup().
 	e->filename = malloc(strlen(filename) + 1);
 	strncpy(e->filename, filename, strlen(filename) + 1);
 	e->contents = contents;
-	e->content_length = statbuf.st_size;
+	e->content_length = content_length;
 
 	// Check if the file is readonly, and warn the user about that.
 	if (access(filename, W_OK) == -1) {
