@@ -766,12 +766,23 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 			}
 		}
 	} else if (dir == SEARCH_BACKWARD) {
+		// if we are already at the beginning of the file, no use for searching
+		// backwards any more.
+		if (current_offset == 0) {
+			editor_statusmessage(e, STATUS_INFO, "Already at start of the file");
+			return;
+		}
+
+		// Decrement the offset once, or else we keep comparing the current offset
+		// position with an already found string, keeping us in the same position.
 		current_offset--;
-		for (; current_offset != 0; current_offset--) {
+
+		// Since we are working with unsigned integers, do this trick in the for-statement
+		// to 'include' the zero offset with comparing.
+		for (; current_offset-- != 0; ) {
 			if (memcmp(e->contents + current_offset, str, strlen(str)) == 0) {
 				editor_statusmessage(e, STATUS_INFO, "");
 				editor_scroll_to_offset(e, current_offset);
-				current_offset--;
 				return;
 			}
 		}
