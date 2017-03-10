@@ -107,6 +107,11 @@ void editor_openfile(struct editor* e, const char* filename) {
 			editor_newfile(e, filename);
 			return;
 		}
+
+		// Other errors (i.e. permission denied). Exit prematurely,
+		// no use in continuing.
+		perror("Unable to open file");
+		exit(1);
 	}
 
 	// stat() the file.
