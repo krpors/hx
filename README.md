@@ -4,7 +4,7 @@ is somewhat influenced by the [kilo project](https://github.com/antirez/kilo).
 
 For an idea how it looks (or should look... :)) :
 
-![hx](http://i.imgur.com/EjQ5TeI.png)
+![hx](https://i.imgur.com/zOpJE1S.png)
 
 # Compiling and running
 The project does not have a dependency on libraries, not even curses. Like the
