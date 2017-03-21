@@ -19,7 +19,7 @@
 #include <sys/stat.h>
 #include <unistd.h>
 
-/**
+/*
  * This function looks convoluted as hell, but it works...
  */
 void editor_move_cursor(struct editor* e, int dir, int amount) {
@@ -1042,7 +1042,7 @@ void editor_undo(struct editor* e) {
 
 }
 
-/**
+/*
  * Initializes editor struct with some default values.
  */
 struct editor* editor_init() {

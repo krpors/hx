@@ -14,7 +14,7 @@
 #include <unistd.h>
 
 
-/**
+/*
  * Create a charbuf on the heap and return it.
  */
 struct charbuf* charbuf_create() {
@@ -30,7 +30,7 @@ struct charbuf* charbuf_create() {
 	}
 }
 
-/**
+/*
  * Deletes the charbuf's contents, and the charbuf itself.
  */
 void charbuf_free(struct charbuf* buf) {
@@ -38,7 +38,7 @@ void charbuf_free(struct charbuf* buf) {
 	free(buf);
 }
 
-/**
+/*
  * Appends `what' to the charbuf, writing at most `len' bytes. Note that
  * if we use snprintf() to format a particular string, we have to subtract
  * 1 from the `len', to discard the null terminator character.
@@ -78,7 +78,7 @@ int charbuf_appendf(struct charbuf* buf, const char* fmt, ...) {
 	return len;
 }
 
-/**
+/*
  * Draws (writes) the charbuf to the screen.
  */
 void charbuf_draw(struct charbuf* buf) {

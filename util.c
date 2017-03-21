@@ -90,7 +90,7 @@ int str2int(const char* s, int min, int max, int def) {
 	return x;
 }
 
-/**
+/*
  * Reads keypresses from stdin, and processes them accordingly. Escape sequences
  * will be read properly as well (e.g. DEL will be the bytes 0x1b, 0x5b, 0x33, 0x7e).
  * The returned integer will contain either one of the enum values, or the key pressed.

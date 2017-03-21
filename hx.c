@@ -37,7 +37,7 @@ static struct editor* g_ec;
 
 volatile sig_atomic_t resizeflag; // flag indicating a SIGWINCH signal was received.
 
-/**
+/*
  * Exits the editor, frees some stuff and resets the terminal setting.
  */
 static void editor_exit() {
@@ -46,7 +46,7 @@ static void editor_exit() {
 	disable_raw_mode();
 }
 
-/**
+/*
  * Prints help to the stderr when invoked with -h or with unknown arguments.
  * Explanation can be given for some extra information.
  */
@@ -68,7 +68,7 @@ static void print_help(const char* explanation) {
 	, explanation);
 }
 
-/**
+/*
  * Prints some version information back to the stdout.
  */
 static void print_version() {
@@ -96,7 +96,7 @@ void debug_keypress() {
 #endif
 
 
-/**
+/*
  * Handles the SIGWINCH signal upon terminal resizing.
  */
 static void handle_term_resize(int sig) {
