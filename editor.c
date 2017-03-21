@@ -366,15 +366,14 @@ void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct c
 	if (rownum == e->cursor_y) {
 		// Check the cursor position on the x axis
 		for (int i = 0; i < (int) strlen(asc); i++) {
-			char x[1];
 			if (i+1 == e->cursor_x) {
 				// Highlight by 'inverting' the color
-				charbuf_append(b, "\x1b[30;47m", 8);
+				charbuf_append(b, "\x1b[7;37m", 7);
 			} else {
 				// Other characters with greenish
-				charbuf_append(b, "\x1b[32;40;1m", 10);
+				charbuf_append(b, "\x1b[0m\x1b[1;32m", 11);
 			}
-			x[0] = asc[i];
+			char x[1] = { asc[i] };
 			charbuf_append(b, x, 1);
 		}
 	} else {
@@ -419,7 +418,11 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	}
 
 	unsigned int offset;
-	int row = 0;
+
+	int row = 0; // Row counter, from 0 to term height
+	int col = 0; // Col counter, from 0 to number of octets per line. Used to render
+	             // a colored cursor per byte.
+
 	for (offset = start_offset; offset < end_offset; offset++) {
 		if (offset % e->octets_per_line == 0) {
 			// start of a new row, beginning with an offset address in hex.
@@ -427,8 +430,10 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 			// Initialize the ascii buffer to all zeroes, and reset the row char count.
 			memset(asc, '\0', sizeof(asc));
 			row_char_count = 0;
+			col = 0;
 			row++;
 		}
+		col++;
 
 		// Format a hex string of the current character in the offset.
 		snprintf(hex, sizeof(hex), "%02x", (unsigned char) e->contents[offset]);
@@ -449,8 +454,20 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 			row_char_count++;
 		}
 
-		// First, write the hex value of the byte at the current offset.
+		// Cursor rendering.
+		if (e->cursor_y == row) {
+			// Render the current row with a different color.
+			charbuf_append(b, "\x1b[1;32m", 7);
+			// Render the selected byte with a different color. Easier
+			// to distinguish in the army of hexadecimal values.
+			if (e->cursor_x == col) {
+				charbuf_append(b, "\x1b[7;37m", 7);
+			}
+		}
+		// Write the hex value of the byte at the current offset, and reset attributes.
 		charbuf_append(b, hex, 2);
+		charbuf_append(b, "\x1b[0m", 4);
+
 		row_char_count += 2;
 
 		// If we reached the end of a 'row', start writing the ASCII equivalents
@@ -609,19 +626,6 @@ void editor_refresh_screen(struct editor* e) {
 
 		// Ruler: move to the right of the screen etc.
 		editor_render_ruler(e, b);
-
-		// Position cursor. This is done by taking into account the current
-		// cursor position (1 .. 40), and the amount of spaces to add due to
-		// grouping.
-		// TODO: this is currently a bit hacky and/or out of place.
-		int curx = (e->cursor_x - 1) * 2; // times 2 characters to represent a byte in hex
-		int spaces = curx / (e->grouping * 2); // determine spaces to add due to grouping.
-		int cruft = curx + spaces + 12; // 12 = the size of the address + ": "
-		if (e->content_length > 0) {
-			// Only position the cursor properly when there's content to display.
-			// Without content, ignore placing the cursor properly.
-			charbuf_appendf(b, "\x1b[%d;%dH", e->cursor_y, cruft);
-		}
 	} else if (e->mode & MODE_COMMAND) {
 		// When in command mode, handle rendering different. For instance,
 		// the cursor is placed at the bottom. Ruler is not required.
