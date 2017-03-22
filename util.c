@@ -189,9 +189,6 @@ void enable_raw_mode() {
 		exit(1);
 	}
 
-	// Disable raw mode when we exit hx normally.
-	//atexit(editor_exit);
-
 	tcgetattr(STDIN_FILENO, &orig_termios);
 
 	struct termios raw = orig_termios;
@@ -202,7 +199,7 @@ void enable_raw_mode() {
 	raw.c_oflag &= ~(OPOST);
 	// control modes - set 8 bit chars
 	raw.c_cflag |= (CS8);
-	// local modes - choing off, canonical off, no extended functions,
+	// local modes - echoing off, canonical off, no extended functions,
 	// no signal chars (^Z,^C)
 	raw.c_lflag &= ~(ECHO | ICANON | IEXTEN | ISIG);
 	// control chars - set return condition: min number of bytes and timer.
@@ -220,7 +217,12 @@ void enable_raw_mode() {
 }
 
 void disable_raw_mode() {
+	// Reset the terminal settings to the state before hx was started.
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
+	// Also, emit a ^[?25h sequence to show the cursor again. The void
+	// construct (with the + 1) is to squelch GCC warnings about unused
+	// return values.
+	(void) (write(STDOUT_FILENO, "\x1b[?25h", 6) + 1);
 }
 
 

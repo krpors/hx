@@ -637,8 +637,6 @@ void editor_refresh_screen(struct editor* e) {
 		charbuf_append(b, e->inputbuffer, e->inputbuffer_index);
 	}
 
-	charbuf_append(b, "\x1b[?25h", 6);
-
 	charbuf_draw(b);
 	charbuf_free(b);
 }
