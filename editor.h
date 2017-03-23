@@ -167,13 +167,14 @@ int editor_read_hex_input(struct editor* e, char* output);
 int editor_read_string(struct editor* e, char* dst, int len);
 
 /*
- * Renders the given ASCII string, `asc' to the buffer `b'. The `rownum'
- * specified should be the row number being rendered in an iteration in
- * editor_render_contents. This function will render the selected byte
- * with a different color in the ASCII row to easily identify which
- * byte is being highlighted.
+ * Renders ASCII values of the editor's contents to the buffer `b'. The
+ * start_offset is used to reference the editor's contents start position
+ * to render. The `rownum' specified should be the row number being rendered
+ * in an iteration in editor_render_contents. This function will render the
+ * selected byte with a different color in the ASCII row to easily identify
+ * which byte is being highlighted.
  */
-void editor_render_ascii(struct editor* e, int rownum, const char* ascii, struct charbuf* b);
+void editor_render_ascii(struct editor* e, int rownum, unsigned int start_offset, struct charbuf* b);
 
 /*
  * Renders the contents of the current state of the editor `e'

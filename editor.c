@@ -357,32 +357,36 @@ int editor_statusmessage(struct editor* e, enum status_severity sev, const char*
 	return x;
 }
 
+void editor_render_ascii(struct editor* e, int rownum, unsigned int start_offset, struct charbuf* b) {
+	int cc = 0; // cursor counter, to check whether we should highlight the current offset.
 
-void editor_render_ascii(struct editor* e, int rownum, const char* asc, struct charbuf* b) {
-	assert(rownum > 0);
-
-	// If the rownum given is the current y cursor position, then render the line
-	// differently from the rest.
-	if (rownum == e->cursor_y) {
-		// Check the cursor position on the x axis
-		for (int i = 0; i < (int) strlen(asc); i++) {
-			if (i+1 == e->cursor_x) {
-				// Highlight by 'inverting' the color
-				charbuf_append(b, "\x1b[7;37m", 7);
-			} else {
-				// Other characters with greenish
-				charbuf_append(b, "\x1b[0m\x1b[1;32m", 11);
-			}
-			char x[1] = { asc[i] };
-			charbuf_append(b, x, 1);
+	for (unsigned int offset = start_offset; offset < start_offset + e->octets_per_line; offset++) {
+		// Make sure we do not go out of bounds.
+		if (offset >= e->content_length) {
+			return;
 		}
-	} else {
-		charbuf_append(b, "\x1b[1;37m", 7);
-		charbuf_append(b, asc, strlen(asc));
+
+		cc++;
+
+		char c =  e->contents[offset];
+
+		// If we need to highlight the cursor in the current iteration,
+		// do so by inverting the color (7m). In all other cases, reset (0m).
+		if (rownum == e->cursor_y && cc == e->cursor_x) {
+			charbuf_append(b, "\x1b[7m", 4);
+		} else {
+			charbuf_appendf(b, "\x1b[0m", 4);
+		}
+
+		// Printable characters use a different color from non-printable characters.
+		if (isprint(c)) {
+			charbuf_appendf(b, "\x1b[33m%c", c);
+		} else {
+			charbuf_append(b, "\x1b[36m.", 6);
+		}
 	}
 	charbuf_append(b, "\x1b[0m", 4);
 }
-
 
 void editor_render_contents(struct editor* e, struct charbuf* b) {
 	if (e->content_length <= 0) {
@@ -426,7 +430,7 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	for (offset = start_offset; offset < end_offset; offset++) {
 		if (offset % e->octets_per_line == 0) {
 			// start of a new row, beginning with an offset address in hex.
-			charbuf_appendf(b, "\x1b[0;33m%09x\x1b[0m:", offset);
+			charbuf_appendf(b, "\x1b[1;35m%09x\x1b[0m:", offset);
 			// Initialize the ascii buffer to all zeroes, and reset the row char count.
 			memset(asc, '\0', sizeof(asc));
 			row_char_count = 0;
@@ -457,7 +461,7 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 		// Cursor rendering.
 		if (e->cursor_y == row) {
 			// Render the current row with a different color.
-			charbuf_append(b, "\x1b[1;32m", 7);
+			charbuf_append(b, "\x1b[0;32m", 7);
 			// Render the selected byte with a different color. Easier
 			// to distinguish in the army of hexadecimal values.
 			if (e->cursor_x == col) {
@@ -470,18 +474,22 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 
 		row_char_count += 2;
 
-		// If we reached the end of a 'row', start writing the ASCII equivalents
-		// of the 'row'. Highlight the current line and offset on the ASCII part.
+		// If we reached the end of a 'row', start writing the ASCII equivalents.
 		if ((offset+1) % e->octets_per_line == 0) {
+			// Two spaces "gap" between the hexadecimal display, and the ASCII equiv.
 			charbuf_append(b, "  ", 2);
-			editor_render_ascii(e, row, asc, b);
+			// Calculate the 'start offset' of the ASCII part to write. Delegate
+			// this to the render_ascii function.
+			int the_offset = offset + 1 - e->octets_per_line;
+			editor_render_ascii(e, row, the_offset, b);
 			charbuf_append(b, "\r\n", 2);
 		}
 	}
 
 	// Check remainder of the last offset. If its bigger than zero,
 	// we got a last line to write (ASCII only).
-	if (offset % e->octets_per_line > 0) {
+	unsigned int leftover = offset % e->octets_per_line;
+	if (leftover > 0) {
 		// Padding characters, to align the ASCII properly. For example, this
 		// could be the output at the end of the file:
 		// 000000420: 0a53 4f46 5457 4152 452e 0a              .SOFTWARE..
@@ -493,7 +501,7 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 		charbuf_append(b, padding, padding_size);
 		charbuf_append(b, "\x1b[0m  ", 6);
 		// render cursor on the ascii when applicable.
-		editor_render_ascii(e, row, asc, b);
+		editor_render_ascii(e, row, offset - leftover, b);
 		free(padding);
 	}
 
