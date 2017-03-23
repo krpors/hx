@@ -4,23 +4,23 @@ is somewhat influenced by the [kilo project](https://github.com/antirez/kilo).
 
 For an idea how it looks (or should look... :)) :
 
-![hx](https://i.imgur.com/zOpJE1S.png)
+![hx](https://i.imgur.com/52UAT7V.png)
 
 # Compiling and running
 The project does not have a dependency on libraries, not even curses. Like the
 kilo editor, it makes use of ANSI escape sequences. The source can be compiled
 by simply running `make`, or `make all` to gzip the manpage as well. To install,
 simply run `make install` (as root). The files are currently installed under
-`/usr/bin/` (binary) and `/usr/share/man/man1` (man page). Not really sure yet
+`/usr/local/bin/` (binary) and `/usr/local/man/man1` (man page). Not really sure yet
 if this is portable across distributions, though.
 
 Running `hx`:
 
-	$ ./hx filename       # open a file
-	$ ./hx -h             # for help
-	$ ./hx -v             # version information
-	$ ./hx -o 32 filename # open file with 32 octets per line
-	$ ./hx -g 8 filename  # open file, set octet grouping to 8
+	hx filename       # open a file
+	hx -h             # for help
+	hx -v             # version information
+	hx -o 32 filename # open file with 32 octets per line
+	hx -g 8 filename  # open file, set octet grouping to 8
 
 Keys which can be used:
 
@@ -60,9 +60,9 @@ mode where manual commands can be typed. The following commands are recognized c
 
 * `:123`      : go to offset 123 (base 10)
 * `:0x7a69`   : go to offset 0x7a69 (base 16), 31337 in base 10.
-* `w`         : writes the file.
-* `q`         : quits (will warn if the buffer is dirty).
-* `q!`        : quits promptly without warning.
+* `:w`         : writes the file.
+* `:q`         : quits (will warn if the buffer is dirty).
+* `:q!`        : quits promptly without warning.
 
 Input is very basic. Cursor movement is not available. Only backspace/enter.
 
@@ -77,6 +77,5 @@ report any leaks so that looks OK :)
 
 # Wishlist and TODOs
 
-1. Colorize changes made to a file?
-1. Searching a byte sequence. Search based on a string works!
-1. Redo actions? Undo works!
+1. Searching a byte sequence (not by ASCII) would be handy.
+1. Undo works, but redo is not yet implemented.
