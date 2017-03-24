@@ -638,10 +638,20 @@ void editor_refresh_screen(struct editor* e) {
 		// When in command mode, handle rendering different. For instance,
 		// the cursor is placed at the bottom. Ruler is not required.
 		// After moving the cursor, clear the entire line ([2K).
-		charbuf_appendf(b, "\x1b[0m\x1b[%d;1H\x1b[2K:", e->screen_rows);
+		charbuf_appendf(b,
+			"\x1b[0m"    // reset attributes
+			"\x1b[?25h"  // display cursor
+			"\x1b[%d;1H" // move cursor down
+			"\x1b[2K:",  // clear line, write a colon.
+			e->screen_rows);
 		charbuf_append(b, e->inputbuffer, e->inputbuffer_index);
 	} else if (e->mode & MODE_SEARCH) {
-		charbuf_appendf(b, "\x1b[0m\x1b[%d;1H\x1b[2K/", e->screen_rows);
+		charbuf_appendf(b,
+			"\x1b[0m"    // reset attributes
+			"\x1b[?25h"  // display cursor
+			"\x1b[%d;1H" // mvoe cursor down
+			"\x1b[2K/",  // clear line, write a slash.
+			e->screen_rows);
 		charbuf_append(b, e->inputbuffer, e->inputbuffer_index);
 	}
 
