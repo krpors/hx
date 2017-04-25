@@ -1012,12 +1012,12 @@ void editor_process_keypress(struct editor* e) {
 			}
 			break;
 
-		case KEY_HOME:     e->cursor_x = 1; return;
-		// TODO: when END on the last line and octets are less than max per line,
-		// the offset is a bit fux0red.
-		case KEY_END:      e->cursor_x = e->octets_per_line; return;
+		case KEY_HOME: e->cursor_x = 1; return;
+		case KEY_END:  editor_move_cursor(e, KEY_RIGHT, e->octets_per_line - e->cursor_x); return;
+
 		case KEY_CTRL_U:
 		case KEY_PAGEUP:   editor_scroll(e, -(e->screen_rows) + 2); return;
+
 		case KEY_CTRL_D:
 		case KEY_PAGEDOWN: editor_scroll(e, e->screen_rows - 2); return;
 		}
