@@ -28,6 +28,9 @@ install: all
 	install -Dm755 -s ./hx -t $(DESTDIR)$(PREFIX)$(bindir)
 	install -Dm644 ./hx.1.gz -t $(DESTDIR)$(PREFIX)$(mandir)/man1
 
+static: all
+static: LDFLAGS += -static
+
 clean:
 	$(RM) $(objects) $(objects:.o=.d) hx.1.gz hx
 
