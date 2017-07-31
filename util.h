@@ -34,6 +34,21 @@ enum key_codes {
 	KEY_PAGEDOWN,       // ??
 };
 
+/*
+ * Saves the current terminal state (the contents) so it can be restored
+ * later, when hx exits. This behaviour is like any other terminal GUI
+ * application. Currently, this writes the 'smcup' terminal capability.
+ * I'm unsure how this will behave when the cap is not available.
+ */
+void term_state_save();
+
+/*
+ * This restores the previously saved terminal contents. This will write
+ * the termcap `rmcup' to stdout. Like term_state_save, I'm not sure how
+ * this will behave when the cap is unavailable.
+ */
+void term_state_restore();
+
 void enable_raw_mode();
 void disable_raw_mode();
 void clear_screen();

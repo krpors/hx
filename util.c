@@ -182,6 +182,19 @@ bool get_window_size(int* rows, int* cols) {
 	return true;
 }
 
+void term_state_save() {
+	// Write a sequence to save the current terminal state (with all the characters
+	// being displayed and such). The + 1 is added to squelch GCC warnings.
+	(void) (write(STDOUT_FILENO, "\x1b[?1049h", 8) + 1);
+}
+
+void term_state_restore() {
+	// Write a sequence to restore the previously saved terminal state. The +1 is
+	// added to squelch GCC warnings.
+	//(void) (write(STDOUT_FILENO, "\x1b[1049l", 8));
+	(void) (write(STDOUT_FILENO, "\x1b[?1049l", 8) + 1);
+}
+
 void enable_raw_mode() {
 	// only enable raw mode when stdin is a tty.
 	if (!isatty(STDIN_FILENO)) {
@@ -209,7 +222,7 @@ void enable_raw_mode() {
 	// whatever reason, because this will skyrocket the cpu usage to 100%!
 	raw.c_cc[VTIME] = 1;
 
-    // put terminal in raw mode after flushing
+	// put terminal in raw mode after flushing
 	if (tcsetattr(STDIN_FILENO, TCSAFLUSH, &raw) != 0) {
 		perror("Unable to set terminal to raw mode");
 		exit(1);

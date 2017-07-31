@@ -44,6 +44,7 @@ static void editor_exit() {
 	editor_free(g_ec);
 	clear_screen();
 	disable_raw_mode();
+	term_state_restore();
 }
 
 /*
@@ -145,7 +146,6 @@ int main(int argc, char* argv[]) {
 		}
 	}
 
-
 	// After all options are parsed, we expect a filename to open.
 	if (optind >= argc) {
 		print_help("error: expected filename\n");
@@ -169,6 +169,8 @@ int main(int argc, char* argv[]) {
 	editor_openfile(g_ec, file);
 
 	enable_raw_mode();
+	term_state_save();
+
 	atexit(editor_exit);
 	clear_screen();
 
