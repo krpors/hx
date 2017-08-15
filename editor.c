@@ -753,6 +753,44 @@ void editor_process_command(struct editor* e, const char* cmd) {
 		return;
 	}
 
+	// Check if we want to set an option at runtime. The first three bytes are
+	// checked first, then the rest is parsed.
+	if (strncmp(cmd, "set ", 4) == 0) {
+		char setcmd[INPUT_BUF_SIZE] = {0};
+		char setval[INPUT_BUF_SIZE] = {0};
+		if (!parse_set_command(cmd, setcmd, setval)) {
+			editor_statusmessage(e, STATUS_ERROR, "Invalid set command");
+			return;
+		}
+
+		// Set the amount of octets per line to a different value.
+		if (strcmp(setcmd, "octets") == 0 || strcmp(setcmd, "o") == 0) {
+			int octets = str2int(setval, 16, 64, 16);
+
+			clear_screen();
+			int offset = editor_offset_at_cursor(e);
+			e->octets_per_line = octets;
+			editor_scroll_to_offset(e, offset);
+
+			editor_statusmessage(e, STATUS_INFO, "Octets per line set to %d", octets);
+
+			return;
+		}
+
+		// Set the grouping of bytes to a different value.
+		if (strcmp(setcmd, "grouping") == 0 || strcmp(setcmd, "g") == 0) {
+			int grouping = str2int(setval, 2, 16, 4);
+			clear_screen();
+			e->grouping = grouping;
+
+			editor_statusmessage(e, STATUS_INFO, "Byte grouping set to %d", grouping);
+			return;
+		}
+
+		editor_statusmessage(e, STATUS_ERROR, "Unknown option: %s", setcmd);
+		return;
+	}
+
 	editor_statusmessage(e, STATUS_ERROR, "Command not found: %s", cmd);
 }
 
