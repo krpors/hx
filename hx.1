@@ -2,9 +2,9 @@
 .\"
 .\" Copyright (c) 2017 Kevin Pors. See LICENSE for details.
 .\"
-.Dd July 31, 2017
+.Dd August 15, 2017
 .Dt HX 1 1
-.Os hx 1.0.6
+.Os hx 1.0.7
 
 .Sh NAME
 .Nm hx
@@ -148,7 +148,7 @@ inserted.
 In replace-mode, the editor replaces the current byte at the current offset with
 a byte of choice. Use 'r' when in normal-mode to switch to replace-mode.
 .Ss COMMAND
-In command-mode, manual commands can be entered. This can be triggered by typing 
+In command-mode, manual commands can be entered. This can be triggered by typing
 the colon (
 .Sy :
 ) character. The cursor will move to the bottom where there's space to type
@@ -156,9 +156,21 @@ a command. Current implemented commands are:
 .Pp
 .Bl -item -compact -offset 2n
 .It
-NUMBER     : go to offset in base 10. For example, ':455' will go to offset '0x1c7'.
+NUM               go to offset in base 10. For example, ':455' will go to offset '0x1c7'.
 .It
-0xHEXVALUE : go to offset in base 16. For example, ':0x1c7' will go to offset '455'.
+0xHEXVALUE        go to offset in base 16. For example, ':0x1c7' will go to offset '455'.
+.It
+set o=NUM         set octets per line to NUM
+.It
+set octets=NUM    idem
+.It
+set g=NUM         set byte grouping to NUM
+.It
+set grouping=NUM  idem
+.It
+w                 write buffer to disk
+.It
+q                 quit (add ! to force quit)
 .El
 
 .\" ===================================================================
