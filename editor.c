@@ -396,8 +396,10 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	}
 
 	// FIXME: proper sizing of these arrays (malloc?)
-	char hex[ 2 + 1];  // example: 65
-	char asc[256 + 1]; // example: Hello.World!
+	char hex[ 32 + 1];  // example: 65
+	int  hexlen = 0;    // assigned by snprintf - we need to know the amount of chars written.
+	char asc[256 + 1];  // example: Hello.World!
+
 
 	// Counter to indicate how many chars have been written for the current
 	// row of data. This is used for later for padding, when the iteration
@@ -428,6 +430,8 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 	             // a colored cursor per byte.
 
 	for (offset = start_offset; offset < end_offset; offset++) {
+		unsigned char curr_byte = e->contents[offset];
+
 		if (offset % e->octets_per_line == 0) {
 			// start of a new row, beginning with an offset address in hex.
 			charbuf_appendf(b, "\x1b[1;35m%09x\x1b[0m:", offset);
@@ -440,13 +444,19 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 		col++;
 
 		// Format a hex string of the current character in the offset.
-		snprintf(hex, sizeof(hex), "%02x", (unsigned char) e->contents[offset]);
+		if (isprint(curr_byte)) {
+			// If the character is printable, use a different color.
+			hexlen = snprintf(hex, sizeof(hex), "\x1b[1;34m%02x", curr_byte);
+		} else {
+			// Non printable: use default color.
+			hexlen = snprintf(hex, sizeof(hex), "%02x", curr_byte);
+		}
 
 		// Every iteration, set the ascii value in the buffer, until
 		// 16 bytes are set. This will be written later when the hex
 		// values are drawn to screen.
-		if (isprint(e->contents[offset])) {
-			asc[offset % e->octets_per_line] = e->contents[offset];
+		if (isprint(curr_byte)) {
+			asc[offset % e->octets_per_line] = curr_byte;
 		} else {
 			// non-printable characters are represented by a dot.
 			asc[offset % e->octets_per_line] = '.';
@@ -460,16 +470,14 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 
 		// Cursor rendering.
 		if (e->cursor_y == row) {
-			// Render the current row with a different color.
-			charbuf_append(b, "\x1b[0;32m", 7);
 			// Render the selected byte with a different color. Easier
 			// to distinguish in the army of hexadecimal values.
 			if (e->cursor_x == col) {
-				charbuf_append(b, "\x1b[7;37m", 7);
+				charbuf_append(b, "\x1b[7m", 4);
 			}
 		}
 		// Write the hex value of the byte at the current offset, and reset attributes.
-		charbuf_append(b, hex, 2);
+		charbuf_append(b, hex, hexlen);
 		charbuf_append(b, "\x1b[0m", 4);
 
 		row_char_count += 2;
