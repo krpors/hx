@@ -1,12 +1,14 @@
 # hx
-Attempt to create a hex editor using plain C + POSIX libs. The project's code
+
+A hex editor using plain C + POSIX libs. The project's code
 is somewhat influenced by the [kilo project](https://github.com/antirez/kilo).
 
-For an idea how it looks (or should look... :)) :
+For an idea how it looks:
 
-![hx](https://i.imgur.com/52UAT7V.png)
+![hx](http://i.imgur.com/5XPbMGW.png)
 
 # Compiling and running
+
 The project does not have a dependency on libraries, not even curses. Like the
 kilo editor, it makes use of ANSI escape sequences. The source can be compiled
 by simply running `make`, or `make all` to gzip the manpage as well. To install,
@@ -60,22 +62,26 @@ mode where manual commands can be typed. The following commands are recognized c
 
 * `:123`      : go to offset 123 (base 10)
 * `:0x7a69`   : go to offset 0x7a69 (base 16), 31337 in base 10.
-* `:w`         : writes the file.
-* `:q`         : quits (will warn if the buffer is dirty).
-* `:q!`        : quits promptly without warning.
+* `:w`        : writes the file.
+* `:q`        : quits (will warn if the buffer is dirty).
+* `:q!`       : quits promptly without warning.
+* `set o=16`  : sets the amount of octets per line.
+* `set g=8`   : sets grouping of bytes.
 
-Input is very basic. Cursor movement is not available. Only backspace/enter.
+Input is very basic in command mode. Cursor movement is not available (yet?).
 
 # Implementation details
+
 The program uses raw ANSI escape sequences for manipulating colors, cursor
 positions and whatnot. The program first initializes the terminal in
 so-called raw mode (see `man termios`). Then keypresses are read, processed
 and then one function renders the contents, cursor and stuff.
 
-Not everything is final and some refactoring is needed. Valgrind doesn't
-report any leaks so that looks OK :)
+In any case, the source code is pretty heavily commented I guess. For more
+details, Use The Source Luke.
 
 # Wishlist and TODOs
 
+1. Perhaps a configuration file to control the colors or some default settings.
 1. Searching a byte sequence (not by ASCII) would be handy.
 1. Undo works, but redo is not yet implemented.
