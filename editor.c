@@ -750,7 +750,7 @@ void editor_process_command(struct editor* e, const char* cmd) {
 			exit(0);
 		}
 	}
-
+	
 	if (strncmp(cmd, "q!", INPUT_BUF_SIZE) == 0) {
 		exit(0);
 		return;
@@ -763,17 +763,20 @@ void editor_process_command(struct editor* e, const char* cmd) {
 
 	// Check if we want to set an option at runtime. The first three bytes are
 	// checked first, then the rest is parsed.
-	if (strncmp(cmd, "set ", 4) == 0) {
+	if (strncmp(cmd, "set", 3) == 0) {
 		char setcmd[INPUT_BUF_SIZE] = {0};
-		char setval[INPUT_BUF_SIZE] = {0};
-		if (!parse_set_command(cmd, setcmd, setval)) {
-			editor_statusmessage(e, STATUS_ERROR, "Invalid set command");
+		int setval = 0;
+		int items_read = sscanf(cmd, "set %[a-z]=%d", setcmd, &setval);
+		// command name_____________________/    /
+		// command value________________________/
+
+		if (items_read != 2) {
+			editor_statusmessage(e, STATUS_ERROR, "set command format: `set cmd=num`");
 			return;
 		}
 
-		// Set the amount of octets per line to a different value.
 		if (strcmp(setcmd, "octets") == 0 || strcmp(setcmd, "o") == 0) {
-			int octets = str2int(setval, 16, 64, 16);
+			int octets = clampi(setval, 16, 64);
 
 			clear_screen();
 			int offset = editor_offset_at_cursor(e);
@@ -787,7 +790,7 @@ void editor_process_command(struct editor* e, const char* cmd) {
 
 		// Set the grouping of bytes to a different value.
 		if (strcmp(setcmd, "grouping") == 0 || strcmp(setcmd, "g") == 0) {
-			int grouping = str2int(setval, 2, 16, 4);
+			int grouping = clampi(setval, 4, 16);
 			clear_screen();
 			e->grouping = grouping;
 

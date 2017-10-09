@@ -86,16 +86,4 @@ int clampi(int i, int min, int max);
  */
 int str2int(const char* s, int min, int max, int def);
 
-/*
- * Parses a string in the form of `set property=value'. 'cmdstr' holds the
- * command string, and the property name will be copied into 'dest_cmd', and
- * the value will be copied into 'dest_val'. True will be returned if the thing
- * was parsed correctly, or false if otherwise.
- *
- * Note that it's expected that 'cmdstr' is 0 terminated, and that the dest_cmd
- * and dest_val contain enough space. Usually it's safe to allocate the same
- * size as the size of cmdstr.
- */
-bool parse_set_command(const char* cmdstr, char* dest_cmd, char* dest_val);
-
 #endif // HX_UTIL_H

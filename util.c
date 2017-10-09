@@ -90,35 +90,6 @@ int str2int(const char* s, int min, int max, int def) {
 	return x;
 }
 
-bool parse_set_command(const char* cmdstr, char* dest_cmd, char* dest_val) {
-	if (strncmp(cmdstr, "set ", 4) < 0) {
-		// nothing found as a set command, return false.
-		return false;
-	}
-	// Skip the first three bytes 'set'
-	cmdstr += 4;
-
-	// Find the = sign in the string.
-	char* eq = strstr(cmdstr, "=");
-	if (eq == NULL) {
-		// nothing found, so no valid 'set' command.
-		// TODO: error code or something to show the user what exactly is wrong.
-		return false;
-	}
-
-	// Pointer arithmetic. Subtract the pointer of cmdstr with the found eq sign
-	// pointer index. This behaviour is sort of a charAt().
-	int ptr = eq - cmdstr;
-
-	// Copy the cmdstring into dest_cmd
-	strncpy(dest_cmd, cmdstr, ptr);
-	// Copy the rest (everything after the equals sign) to dest_val.
-	strncpy(dest_val, cmdstr+ptr+1, strlen(cmdstr) - ptr);
-
-	// Return true, since everything went a-okay.
-	return true;
-}
-
 /*
  * Reads keypresses from stdin, and processes them accordingly. Escape sequences
  * will be read properly as well (e.g. DEL will be the bytes 0x1b, 0x5b, 0x33, 0x7e).
