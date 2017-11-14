@@ -1041,7 +1041,8 @@ void editor_process_keypress(struct editor* e) {
 		case ':': editor_setmode(e, MODE_COMMAND);      return;
 		case '/': editor_setmode(e, MODE_SEARCH);       return;
 
-		case 'u': editor_undo(e); return;
+		case 'u':  editor_undo(e); return;
+		case 'R' : editor_redo(e); return;
 
 		// move `grouping` amount back or forward:
 		case 'b': editor_move_cursor(e, KEY_LEFT, e->grouping); break;
@@ -1087,6 +1088,8 @@ void editor_undo(struct editor* e) {
 		return;
 	}
 
+	// Save the old contents in case we're undoing a replace.
+	char old_contents = e->contents[last_action->offset];
 	switch (last_action->act) {
 	case ACTION_APPEND:
 		editor_delete_char_at_offset(e, last_action->offset+1);
@@ -1096,6 +1099,7 @@ void editor_undo(struct editor* e) {
 		break;
 	case ACTION_REPLACE:
 		e->contents[last_action->offset] = last_action->c;
+		last_action->c = old_contents;
 		break;
 	case ACTION_INSERT:
 		editor_delete_char_at_offset(e, last_action->offset);
@@ -1110,11 +1114,63 @@ void editor_undo(struct editor* e) {
 			action_type_name(last_action->act),
 			last_action->offset,
 			last_action->c,
-			action_list_size(e->undo_list) - 1); // subtract one due to the deletion
-			                                     // in the next statement
+			action_list_size(e->undo_list) - 1); // TODO
 
 	// Move to the previous action.
 	action_list_move(e->undo_list, -1);
+}
+
+void editor_redo(struct editor* e) {
+	if (e->undo_list->curr_status == AFTER_TAIL
+	    || e->undo_list->curr_status == NOTHING) {
+		editor_statusmessage(e, STATUS_INFO, "No action to redo");
+		return;
+	}
+
+	struct action* next_action = NULL;
+
+	if (e->undo_list->curr_status == BEFORE_HEAD) {
+		next_action = e->undo_list->head;
+	} else {  // == NODE
+		next_action = e->undo_list->curr->next;
+	}
+
+	if (next_action == NULL) {
+		// May happen when curr is tail.
+		editor_statusmessage(e, STATUS_INFO, "No action to redo");
+		return;
+	}
+
+	// Save the old contents in case we're redoing a replace.
+	char old_contents = e->contents[next_action->offset];
+	switch (next_action->act) {
+	case ACTION_APPEND:
+		editor_insert_byte_at_offset(e, next_action->offset, next_action->c, true);
+		break;
+	case ACTION_DELETE:
+		editor_delete_char_at_offset(e, next_action->offset);
+		break;
+	case ACTION_REPLACE:
+		e->contents[next_action->offset] = next_action->c;
+		next_action->c = old_contents;
+		break;
+	case ACTION_INSERT:
+		editor_insert_byte_at_offset(e, next_action->offset, next_action->c, false);
+		break;
+	}
+
+	// Move cursor to the redone action's offset.
+	editor_scroll_to_offset(e, next_action->offset);
+
+	editor_statusmessage(e, STATUS_INFO,
+		"Redone '%s' at offset %d to byte '%02x' (%d left)",
+			action_type_name(next_action->act),
+			next_action->offset,
+			next_action->c,
+			action_list_size(e->undo_list) - 1); // TODO
+
+	// Move to the previous action.
+	action_list_move(e->undo_list, 1);
 }
 
 /*

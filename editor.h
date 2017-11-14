@@ -248,6 +248,11 @@ int editor_statusmessage(struct editor* e, enum status_severity s, const char* f
 void editor_undo(struct editor* e);
 
 /*
+ * Redoes an action.
+ */
+void editor_redo(struct editor* e);
+
+/*
  * Writes the contents of the editor's buffer the to the same filename.
  */
 void editor_writefile(struct editor* e);
