@@ -132,3 +132,8 @@ unsigned int action_list_size(struct action_list* list) {
 	return size;
 }
 
+void action_list_move(struct action_list* list, int direction) {
+	(void)list;
+	(void)direction;
+}
+

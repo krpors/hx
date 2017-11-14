@@ -51,8 +51,9 @@ const char* action_type_name(enum action_type type);
  * to operate on this struct to add or delete `action's.
  */
 struct action_list {
-	struct action* head; // head/start of the list
-	struct action* tail; // tail/end of the list.
+	struct action* head; // Head/start of the list.
+	struct action* curr; // Current position within the list.
+	struct action* tail; // Tail/end of the list.
 };
 
 /*
@@ -89,5 +90,14 @@ void action_list_print(struct action_list* list);
  * Gets the size of the list.
  */
 unsigned int action_list_size(struct action_list* list);
+
+/*
+ * Moves the curr pointer forwards or backwards one action within the
+ * action_list according to direction.
+ * If direction < 0, then curr moves backwards.
+ * If direction > 0, then curr moves forward.
+ * (Does nothing if direction == 0.)
+ */
+void action_list_move(struct action_list* list, int direction);
 
 #endif // HX_UNDO_H
