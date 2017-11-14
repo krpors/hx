@@ -27,6 +27,7 @@ struct action_list* action_list_init() {
 	struct action_list* list = malloc(sizeof(struct action_list));
 	list->head = NULL;
 	list->tail = NULL;
+	list->curr = NULL;
 	return list;
 }
 
@@ -52,6 +53,8 @@ void action_list_add(struct action_list* list, enum action_type type, int offset
 		// Then
 		list->tail = action;
 	}
+
+	list->curr = action;
 }
 
 void action_list_delete(struct action_list* list, struct action* action) {
@@ -76,11 +79,13 @@ void action_list_delete(struct action_list* list, struct action* action) {
 	}
 
 	bool remove = (action == list->head);
+	bool curr_removed = false;
 
 	// temp node
 	struct action* node = action;
 	while (node != NULL) {
 		struct action* temp = node;
+		if (list->curr == temp) curr_removed = true;
 		node = temp->next;
 		free(temp);
 		temp = NULL;
@@ -90,6 +95,9 @@ void action_list_delete(struct action_list* list, struct action* action) {
 		list->head = NULL;
 		list->tail = NULL;
 	}
+
+	// If curr was removed it was after tail - so move it to the latest.
+	if (curr_removed) list->curr = list->tail;
 }
 
 void action_list_free(struct action_list* list) {
