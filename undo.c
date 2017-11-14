@@ -41,6 +41,16 @@ void action_list_add(struct action_list* list, enum action_type type, int offset
 	action->offset = offset;
 	action->c = c;
 
+	// Delete the nodes after curr so as to "reset" the redo state.
+	// We redo the head check since delete may change head.
+	if (list->head != NULL) {
+		// If curr IS tail, we want to just add to the end of the list,
+		// so there is nothing to delete.
+		if (list->curr != list->tail) {
+			action_list_delete(list, list->curr->next);
+		}
+	}
+
 	if (list->head == NULL) {
 		// is this the first node added to the list?
 		list->head = action;
@@ -54,6 +64,7 @@ void action_list_add(struct action_list* list, enum action_type type, int offset
 		list->tail = action;
 	}
 
+	// curr is the new action unconditionally.
 	list->curr = action;
 }
 
