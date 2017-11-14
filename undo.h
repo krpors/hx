@@ -10,11 +10,12 @@
 /*
  * Contains definitions and functions to allow undo/redo actions.
  * It's basically a double-linked list, where the tail is the last
- * action done, and the head the first. By undoing, the tail is
- * currently removed. Needs further work.
+ * action done, and the head the first. curr points to the last
+ * performed action - so undoing undoes curr and redoing redoes
+ * curr->next.
  */
 
-// Type of undo actions.
+// Type of undo/redo actions.
 enum action_type {
 	ACTION_DELETE,  // character deleted
 	ACTION_INSERT,  // character inserted

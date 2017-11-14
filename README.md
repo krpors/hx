@@ -39,6 +39,7 @@ Keys which can be used:
 	n       : Search for next occurrence.
 	N       : Search for previous occurrence.
 	u       : Undo the last action.
+	R       : Redo the last undone action.
 
 	a       : Append mode. Appends a byte after the current cursor position.
 	A       : Append mode. Appends the literal typed keys (except ESC).
@@ -84,4 +85,3 @@ details, Use The Source Luke.
 
 1. Perhaps a configuration file to control the colors or some default settings.
 1. Searching a byte sequence (not by ASCII) would be handy.
-1. Undo works, but redo is not yet implemented.

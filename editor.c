@@ -547,6 +547,7 @@ void editor_render_help(struct editor* e) {
 		"n       : Search for next occurrence.\r\n"
 		"N       : Search for previous occurrence.\r\n"
 		"u       : Undo the last action.\r\n"
+		"R       : Redo the last undone action.\r\n"
 		"\r\n");
 	charbuf_appendf(b,
 		"a       : Append mode. Appends a byte after the current cursor position.\r\n"
