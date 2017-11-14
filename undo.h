@@ -101,6 +101,12 @@ void action_list_print(struct action_list* list);
 unsigned int action_list_size(struct action_list* list);
 
 /*
+ * Gets the position of curr in the list. A value of 0 means curr
+ * is before the head (so curr == head means it's at position 1).
+ */
+unsigned int action_list_curr_pos(struct action_list* list);
+
+/*
  * Moves the curr pointer forwards or backwards one action within the
  * action_list according to direction.
  * If direction < 0, then curr moves backwards.

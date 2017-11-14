@@ -158,6 +158,19 @@ unsigned int action_list_size(struct action_list* list) {
 	return size;
 }
 
+unsigned int action_list_curr_pos(struct action_list* list) {
+	if (list->curr == NULL) return 0;
+	unsigned int size = 1;
+	struct action* node = list->head;
+
+	for (node = list->head; node != NULL && node != list->curr;
+	     node = node->next) {
+		++size;
+	}
+
+	return size;
+}
+
 void action_list_move(struct action_list* list, int direction) {
 	if (direction == 0) return;
 	if (list == NULL) return;
