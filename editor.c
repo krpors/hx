@@ -1074,8 +1074,15 @@ void editor_process_keypress(struct editor* e) {
 }
 
 void editor_undo(struct editor* e) {
-	struct action* last_action = e->undo_list->tail;
-	if (last_action == NULL) {
+	struct action* last_action = e->undo_list->curr;
+
+	if (e->undo_list->curr_status == AFTER_TAIL) {
+		// Move back to undo the previous action.
+		action_list_move(e->undo_list, -1);
+	}
+
+	if (e->undo_list->curr_status != NODE) {
+		// Either curr is before head or the list is empty.
 		editor_statusmessage(e, STATUS_INFO, "No action to undo");
 		return;
 	}
@@ -1106,9 +1113,8 @@ void editor_undo(struct editor* e) {
 			action_list_size(e->undo_list) - 1); // subtract one due to the deletion
 			                                     // in the next statement
 
-	// pop it for now, from the list.
-	action_list_delete(e->undo_list, last_action);
-
+	// Move to the previous action.
+	action_list_move(e->undo_list, -1);
 }
 
 /*
