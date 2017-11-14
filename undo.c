@@ -141,7 +141,17 @@ unsigned int action_list_size(struct action_list* list) {
 }
 
 void action_list_move(struct action_list* list, int direction) {
-	(void)list;
-	(void)direction;
+	if (direction == 0) return;
+	if (list == NULL) return;
+	// This should never happen if the last check passed.
+	if (list->curr == NULL) return;
+
+	if (direction > 0) {
+		// Move forward.
+		if (list->curr != list->tail) list->curr = list->curr->next;
+	} else {
+		// Move backwards
+		if (list->curr != list->head) list->curr = list->curr->prev;
+	}
 }
 
