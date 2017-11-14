@@ -1109,15 +1109,15 @@ void editor_undo(struct editor* e) {
 	// move cursor to the undone action's offset.
 	editor_scroll_to_offset(e, last_action->offset);
 
+	// Move to the previous action.
+	action_list_move(e->undo_list, -1);
+
 	editor_statusmessage(e, STATUS_INFO,
 		"Reverted '%s' at offset %d to byte '%02x' (%d left)",
 			action_type_name(last_action->act),
 			last_action->offset,
 			last_action->c,
-			action_list_size(e->undo_list) - 1); // TODO
-
-	// Move to the previous action.
-	action_list_move(e->undo_list, -1);
+			action_list_curr_pos(e->undo_list));
 }
 
 void editor_redo(struct editor* e) {
@@ -1162,15 +1162,16 @@ void editor_redo(struct editor* e) {
 	// Move cursor to the redone action's offset.
 	editor_scroll_to_offset(e, next_action->offset);
 
+	// Move to the next action.
+	action_list_move(e->undo_list, 1);
+
 	editor_statusmessage(e, STATUS_INFO,
 		"Redone '%s' at offset %d to byte '%02x' (%d left)",
 			action_type_name(next_action->act),
 			next_action->offset,
 			next_action->c,
-			action_list_size(e->undo_list) - 1); // TODO
-
-	// Move to the previous action.
-	action_list_move(e->undo_list, 1);
+			action_list_size(e->undo_list)
+			- action_list_curr_pos(e->undo_list));
 }
 
 /*
