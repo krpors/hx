@@ -22,6 +22,14 @@ enum action_type {
 	ACTION_APPEND   // character appended
 };
 
+/* The status of the position that curr is currently at. */
+enum curr_pos {
+	BEFORE_HEAD,  // curr is NULL and before head.
+	NODE,         // curr points to an action.
+	AFTER_TAIL,   // curr is NULL and after tail.
+	NOTHING       // curr is NULL and none of the above.
+};
+
 /*
  * This struct contains the data about an action, as well as the pointers
  * to the previous action (or NULL if this is the first), the next action
@@ -51,9 +59,10 @@ const char* action_type_name(enum action_type type);
  * to operate on this struct to add or delete `action's.
  */
 struct action_list {
-	struct action* head; // Head/start of the list.
-	struct action* curr; // Current position within the list.
-	struct action* tail; // Tail/end of the list.
+	struct action* head;  // Head/start of the list.
+	struct action* curr;  // Current position within the list.
+	enum curr_pos curr_status; // Meta position of curr.
+	struct action* tail;  // Tail/end of the list.
 };
 
 /*

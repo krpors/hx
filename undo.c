@@ -42,12 +42,13 @@ void action_list_add(struct action_list* list, enum action_type type, int offset
 	action->c = c;
 
 	// Delete the nodes after curr so as to "reset" the redo state.
-	// We redo the head check since delete may change head.
-	if (list->head != NULL) {
-		// If curr IS tail, we want to just add to the end of the list,
-		// so there is nothing to delete.
-		if (list->curr != list->tail) {
+	// If curr IS tail, we want to just add to the end of the list,
+	// so there is nothing to delete.
+	if (list->head != NULL && list->curr != list->tail) {
+		if (list->curr_status == NODE) {
 			action_list_delete(list, list->curr->next);
+		} else if (list->curr_status == BEFORE_HEAD) {
+			action_list_delete(list, list->head);
 		}
 	}
 
@@ -66,6 +67,7 @@ void action_list_add(struct action_list* list, enum action_type type, int offset
 
 	// curr is the new action unconditionally.
 	list->curr = action;
+	list->curr_status = NODE;
 }
 
 void action_list_delete(struct action_list* list, struct action* action) {
@@ -108,7 +110,12 @@ void action_list_delete(struct action_list* list, struct action* action) {
 	}
 
 	// If curr was removed it was after tail - so move it to the latest.
-	if (curr_removed) list->curr = list->tail;
+	if (curr_removed) {
+		list->curr = list->tail;
+		list->curr_status = NODE;
+	}
+
+	if (action_list_size(list) == 0) list->curr_status = NOTHING;
 }
 
 void action_list_free(struct action_list* list) {
@@ -154,15 +161,42 @@ unsigned int action_list_size(struct action_list* list) {
 void action_list_move(struct action_list* list, int direction) {
 	if (direction == 0) return;
 	if (list == NULL) return;
-	// This should never happen if the last check passed.
-	if (list->curr == NULL) return;
+
+	// Valid (empty) list, but nothing to do.
+	if (action_list_size(list) == 0) return;
 
 	if (direction > 0) {
-		// Move forward.
-		if (list->curr != list->tail) list->curr = list->curr->next;
+		switch (list->curr_status) {
+		case BEFORE_HEAD:
+			list->curr = list->head;
+			list->curr_status = NODE;
+			break;
+		case NODE:
+			list->curr = list->curr->next;
+			// If curr is NULL, it must have been tail.
+			if (list->curr == NULL) list->curr_status = AFTER_TAIL;
+			break;
+		// Nothing to do for AFTER_TAIL and NOTHING.
+		case AFTER_TAIL:
+		case NOTHING:
+			break;
+		}
 	} else {
-		// Move backwards
-		if (list->curr != list->head) list->curr = list->curr->prev;
+		switch (list->curr_status) {
+		case NODE:
+			list->curr = list->curr->prev;
+			// If curr is NULL, it must have been head.
+			if (list->curr == NULL) list->curr_status = BEFORE_HEAD;
+			break;
+		case AFTER_TAIL:
+			list->curr = list->tail;
+			list->curr_status = NODE;
+			break;
+		// Nothing to do for BEFORE_HEAD and NOTHING.
+		case BEFORE_HEAD:
+		case NOTHING:
+			break;
+		}
 	}
 }
 
