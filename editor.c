@@ -547,7 +547,7 @@ void editor_render_help(struct editor* e) {
 		"n       : Search for next occurrence.\r\n"
 		"N       : Search for previous occurrence.\r\n"
 		"u       : Undo the last action.\r\n"
-		"R       : Redo the last undone action.\r\n"
+		"CTRL+R  : Redo the last undone action.\r\n"
 		"\r\n");
 	charbuf_appendf(b,
 		"a       : Append mode. Appends a byte after the current cursor position.\r\n"
@@ -1042,8 +1042,8 @@ void editor_process_keypress(struct editor* e) {
 		case ':': editor_setmode(e, MODE_COMMAND);      return;
 		case '/': editor_setmode(e, MODE_SEARCH);       return;
 
-		case 'u':  editor_undo(e); return;
-		case 'R' : editor_redo(e); return;
+		case 'u':         editor_undo(e); return;
+		case KEY_CTRL_R : editor_redo(e); return;
 
 		// move `grouping` amount back or forward:
 		case 'b': editor_move_cursor(e, KEY_LEFT, e->grouping); break;

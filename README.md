@@ -39,7 +39,7 @@ Keys which can be used:
 	n       : Search for next occurrence.
 	N       : Search for previous occurrence.
 	u       : Undo the last action.
-	R       : Redo the last undone action.
+	CTRL+R  : Redo the last undone action.
 
 	a       : Append mode. Appends a byte after the current cursor position.
 	A       : Append mode. Appends the literal typed keys (except ESC).
