@@ -806,6 +806,31 @@ void editor_process_command(struct editor* e, const char* cmd) {
 	editor_statusmessage(e, STATUS_ERROR, "Command not found: %s", cmd);
 }
 
+/*
+ * Reads search_input and inserts 1 byte per "object" into search_str.
+ * search_str can then be used directly to search the file.
+ *
+ * Objects are:
+ *  - ASCII bytes entered normally e.g. 'a', '$', '2'.
+ *  - "\xXY" where X and Y match [0-9a-fA-F] (hex representation of bytes).
+ *  - "\\" which represents a single '\'
+ *
+ * Both search_input and search_str must be at least len in size.
+ *
+ * On success, true is returned and search_str can be used. On failure,
+ * an error is reported to e, false is returned and search_str is the
+ *  empty string.
+ */
+static bool parse_search_string(const char* search_input,
+                                const char* search_str, size_t len,
+                                struct editor* e) {
+	(void)search_input;
+	(void)search_str;
+	(void)len;
+	(void)e;
+	return false;
+}
+
 void editor_process_search(struct editor* e, const char* str, enum search_direction dir) {
 	// Empty search string, reset the searchstr to an empty one and
 	// stops searching anything.
