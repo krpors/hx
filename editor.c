@@ -807,11 +807,6 @@ void editor_process_command(struct editor* e, const char* cmd) {
 }
 
 void editor_process_search(struct editor* e, const char* str, enum search_direction dir) {
-	if (str[0] == '0' && str[1] == 'x') {
-		// TODO: search hex value in e->contents
-		return;
-	}
-
 	// Empty search string, reset the searchstr to an empty one and
 	// stops searching anything.
 	if (strncmp(str, "", INPUT_BUF_SIZE) == 0) {
