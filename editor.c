@@ -892,12 +892,16 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 		strncpy(e->searchstr, str, INPUT_BUF_SIZE);
 	}
 
+	char parsedstr[INPUT_BUF_SIZE];
+	parse_search_string(str, parsedstr, e);
+
 	unsigned int current_offset = editor_offset_at_cursor(e);
 
 	if (dir == SEARCH_FORWARD) {
 		current_offset++;
 		for (; current_offset < e->content_length; current_offset++) {
-			if (memcmp(e->contents + current_offset, str, strlen(str)) == 0) {
+			if (memcmp(e->contents + current_offset, parsedstr,
+				   strlen(parsedstr)) == 0) {
 				editor_statusmessage(e, STATUS_INFO, "");
 				editor_scroll_to_offset(e, current_offset);
 				return;
@@ -918,7 +922,8 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 		// Since we are working with unsigned integers, do this trick in the for-statement
 		// to 'include' the zero offset with comparing.
 		for (; current_offset-- != 0; ) {
-			if (memcmp(e->contents + current_offset, str, strlen(str)) == 0) {
+			if (memcmp(e->contents + current_offset, parsedstr,
+				   strlen(parsedstr)) == 0) {
 				editor_statusmessage(e, STATUS_INFO, "");
 				editor_scroll_to_offset(e, current_offset);
 				return;
