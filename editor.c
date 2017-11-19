@@ -807,23 +807,23 @@ void editor_process_command(struct editor* e, const char* cmd) {
 }
 
 /*
- * Reads search_input and inserts 1 byte per "object" into search_str.
- * search_str can then be used directly to search the file.
+ * Reads inputstr and inserts 1 byte per "object" into parsedstr.
+ * parsedstr can then be used directly to search the file.
+ * e is used only to report errors.
  *
  * Objects are:
  *  - ASCII bytes entered normally e.g. 'a', '$', '2'.
  *  - "\xXY" where X and Y match [0-9a-fA-F] (hex representation of bytes).
  *  - "\\" which represents a single '\'
  *
- * Both search_str must be able to fit all the characters in input_str,
+ * Both parsedstr must be able to fit all the characters in inputstr,
  * includes the terminating null byte.
  *
- * On success, true is returned and search_str can be used. On failure,
- * an error is reported to e, false is returned and search_str is the
+ * On success, true is returned and parsedstr can be used. On failure,
+ * an error is reported to e, false is returned and parsedstr is the
  * empty string.
  */
-static bool parse_search_string(const char* input_str,
-                                char* search_str,
+static bool parse_search_string(const char* inputstr, char* parsedstr,
                                 struct editor* e) {
 	(void)e;
 	unsigned int out_i = 0;
@@ -831,32 +831,32 @@ static bool parse_search_string(const char* input_str,
 	char hex[3] = {'\0'};
 	bool err = false;
 
-	while (*input_str != '\0') {
-		if (*input_str == '\\') {
-			++input_str;
-			switch (*(input_str)) {
+	while (*inputstr != '\0') {
+		if (*inputstr == '\\') {
+			++inputstr;
+			switch (*(inputstr)) {
 			case '\0':  // We have "\\0"
 				// TODO: error - \ followed by nothing.
 				break;
 			case '\\':  // We have: "\\".
-				search_str[out_i] = '\\';
-				++input_str;
+				parsedstr[out_i] = '\\';
+				++inputstr;
 				break;
 			case 'x':  // We have: "\x".
-				++input_str;
+				++inputstr;
 
-				if (*input_str == '\0'
-				    || *(input_str + 1) == '\0'
-				    || !isxdigit(*input_str)
-				    || !isxdigit(*input_str + 1)) {
+				if (*inputstr == '\0'
+				    || *(inputstr + 1) == '\0'
+				    || !isxdigit(*inputstr)
+				    || !isxdigit(*inputstr + 1)) {
 					// TODO: error - not hex value.
 				}
 
 				// We have: "\xXY" (valid X, Y).
-				memcpy(hex, input_str, 2);
-				search_str[out_i] = hex2bin(hex);
+				memcpy(hex, inputstr, 2);
+				parsedstr[out_i] = hex2bin(hex);
 
-				input_str += 2;
+				inputstr += 2;
 				break;
 			default:
 				// TODO: error - invalid char after \.
@@ -864,8 +864,8 @@ static bool parse_search_string(const char* input_str,
 			}
 		} else {
 			// Nothing interesting.
-			search_str[out_i] = *input_str;
-			++input_str;
+			parsedstr[out_i] = *inputstr;
+			++inputstr;
 		}
 
 		// Problem - stop, and terminate the string before returning.
@@ -874,7 +874,7 @@ static bool parse_search_string(const char* input_str,
 		++out_i;
 	}
 
-	search_str[out_i] = '\0';
+	parsedstr[out_i] = '\0';
 
 	return !err;
 }
