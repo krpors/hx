@@ -825,18 +825,22 @@ void editor_process_command(struct editor* e, const char* cmd) {
  */
 static bool parse_search_string(const char* inputstr, char* parsedstr,
                                 struct editor* e) {
-	(void)e;
 	unsigned int out_i = 0;
 	// Used to pass values to hex2bin.
 	char hex[3] = {'\0'};
 	bool err = false;
+	const char *origstr = inputstr;
 
 	while (*inputstr != '\0') {
 		if (*inputstr == '\\') {
 			++inputstr;
 			switch (*(inputstr)) {
 			case '\0':  // We have "\\0"
-				// TODO: error - \ followed by nothing.
+				err = true;
+				editor_statusmessage(e, STATUS_ERROR,
+						     "Nothing follows '\\' in"
+						     " search string: %s",
+						     origstr);
 				break;
 			case '\\':  // We have: "\\".
 				parsedstr[out_i] = '\\';
@@ -846,10 +850,24 @@ static bool parse_search_string(const char* inputstr, char* parsedstr,
 				++inputstr;
 
 				if (*inputstr == '\0'
-				    || *(inputstr + 1) == '\0'
-				    || !isxdigit(*inputstr)
+				    || *(inputstr + 1) == '\0') {
+					err = true;
+					editor_statusmessage(e, STATUS_ERROR,
+						"Incomplete hex value at end"
+						" of search string: %s",
+						origstr);
+					break;
+				}
+
+				if (!isxdigit(*inputstr)
 				    || !isxdigit(*inputstr + 1)) {
-					// TODO: error - not hex value.
+					err = true;
+					editor_statusmessage(e, STATUS_ERROR,
+						"Invalid hex value (\\x%c%c)"
+						" in search string: %s",
+						*inputstr, *(inputstr + 1),
+						origstr);
+					break;
 				}
 
 				// We have: "\xXY" (valid X, Y).
@@ -859,7 +877,12 @@ static bool parse_search_string(const char* inputstr, char* parsedstr,
 				inputstr += 2;
 				break;
 			default:
-				// TODO: error - invalid char after \.
+				// No need to increment - we're failing.
+				err = true;
+				editor_statusmessage(e, STATUS_ERROR,
+					"Invalid escape character (%c)"
+					" in search string: %s",
+					*inputstr, origstr);
                                 break;
 			}
 		} else {
@@ -893,7 +916,7 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 	}
 
 	char parsedstr[INPUT_BUF_SIZE];
-	parse_search_string(str, parsedstr, e);
+	if (!parse_search_string(str, parsedstr, e)) return;
 
 	unsigned int current_offset = editor_offset_at_cursor(e);
 
