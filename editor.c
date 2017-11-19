@@ -860,7 +860,7 @@ static bool parse_search_string(const char* inputstr, char* parsedstr,
 				}
 
 				if (!isxdigit(*inputstr)
-				    || !isxdigit(*inputstr + 1)) {
+				    || !isxdigit(*(inputstr + 1))) {
 					err = true;
 					editor_statusmessage(e, STATUS_ERROR,
 						"Invalid hex value (\\x%c%c)"
