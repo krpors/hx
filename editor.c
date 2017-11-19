@@ -815,20 +815,68 @@ void editor_process_command(struct editor* e, const char* cmd) {
  *  - "\xXY" where X and Y match [0-9a-fA-F] (hex representation of bytes).
  *  - "\\" which represents a single '\'
  *
- * Both search_input and search_str must be at least len in size.
+ * Both search_str must be able to fit all the characters in input_str,
+ * includes the terminating null byte.
  *
  * On success, true is returned and search_str can be used. On failure,
  * an error is reported to e, false is returned and search_str is the
- *  empty string.
+ * empty string.
  */
-static bool parse_search_string(const char* search_input,
-                                const char* search_str, size_t len,
+static bool parse_search_string(const char* input_str,
+                                char* search_str,
                                 struct editor* e) {
-	(void)search_input;
-	(void)search_str;
-	(void)len;
 	(void)e;
-	return false;
+	unsigned int out_i = 0;
+	// Used to pass values to hex2bin.
+	char hex[3] = {'\0'};
+	bool err = false;
+
+	while (*input_str != '\0') {
+		if (*input_str == '\\') {
+			++input_str;
+			switch (*(input_str)) {
+			case '\0':  // We have "\\0"
+				// TODO: error - \ followed by nothing.
+				break;
+			case '\\':  // We have: "\\".
+				search_str[out_i] = '\\';
+				++input_str;
+				break;
+			case 'x':  // We have: "\x".
+				++input_str;
+
+				if (*input_str == '\0'
+				    || *(input_str + 1) == '\0'
+				    || !isxdigit(*input_str)
+				    || !isxdigit(*input_str + 1)) {
+					// TODO: error - not hex value.
+				}
+
+				// We have: "\xXY" (valid X, Y).
+				memcpy(hex, input_str, 2);
+				search_str[out_i] = hex2bin(hex);
+
+				input_str += 2;
+				break;
+			default:
+				// TODO: error - invalid char after \.
+                                break;
+			}
+		} else {
+			// Nothing interesting.
+			search_str[out_i] = *input_str;
+			++input_str;
+		}
+
+		// Problem - stop, and terminate the string before returning.
+		if (err) break;
+
+		++out_i;
+	}
+
+	search_str[out_i] = '\0';
+
+	return !err;
 }
 
 void editor_process_search(struct editor* e, const char* str, enum search_direction dir) {
