@@ -35,7 +35,9 @@ enum key_codes {
 	KEY_PAGEDOWN,       // ??
 };
 
+// Errors which may be returned by parse_search_string.
 enum parse_errors {
+	SUCCESS,
 	INCOMPLETE_BACKSLASH,  // "...\"
 	INCOMPLETE_HEX,        // "...\x" or "...\xA"
 	INVALID_HEX,           // "...\xXY..." and X or Y not in [a-zA-Z0-9]
