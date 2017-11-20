@@ -817,19 +817,18 @@ void editor_process_command(struct editor* e, const char* cmd) {
  *  - "\\" which represents a single '\'
  *
  * Both parsedstr must be able to fit all the characters in inputstr,
- * includes the terminating null byte.
+ * including the terminating null byte.
  *
  * On success, true is returned and parsedstr can be used. On failure,
- * an error is reported to e, false is returned and parsedstr is the
- * empty string.
+ * an error is reported to e, false is returned and parsedstr is undefined.
  */
 static bool parse_search_string(const char* inputstr, char* parsedstr,
                                 struct editor* e) {
+	const char *origstr = inputstr;
 	unsigned int out_i = 0;
 	// Used to pass values to hex2bin.
 	char hex[3] = {'\0'};
 	bool err = false;
-	const char *origstr = inputstr;
 
 	while (*inputstr != '\0') {
 		if (*inputstr == '\\') {
@@ -880,7 +879,7 @@ static bool parse_search_string(const char* inputstr, char* parsedstr,
 				// No need to increment - we're failing.
 				err = true;
 				editor_statusmessage(e, STATUS_ERROR,
-					"Invalid escape character (%c)"
+					"Invalid character after \\ (%c)"
 					" in search string: %s",
 					*inputstr, origstr);
                                 break;
