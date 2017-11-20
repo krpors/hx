@@ -290,7 +290,8 @@ int parse_search_string(const char* inputstr, char* parsedstr,
 			default:
 				// No need to increment - we're failing.
 				*err_info = inputstr;
-                                return PARSE_INVALID_ESCAPE;
+				*parsedstr = '\0';
+				return PARSE_INVALID_ESCAPE;
 			}
 		} else {
 			// Nothing interesting.
