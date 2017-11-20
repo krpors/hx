@@ -832,7 +832,6 @@ void editor_process_command(struct editor* e, const char* cmd) {
  */
 static int parse_search_string(const char* inputstr, char* parsedstr,
                                const char** err_info) {
-	unsigned int out_i = 0;
 	// Used to pass values to hex2bin.
 	char hex[3] = {'\0'};
 	*err_info = inputstr;
@@ -845,7 +844,7 @@ static int parse_search_string(const char* inputstr, char* parsedstr,
 				*parsedstr = '\0';
 				return PARSE_INCOMPLETE_BACKSLASH;
 			case '\\':  // We have: "\\".
-				parsedstr[out_i] = '\\';
+				*parsedstr = '\\';
 				++inputstr;
 				break;
 			case 'x':  // We have: "\x".
@@ -866,7 +865,7 @@ static int parse_search_string(const char* inputstr, char* parsedstr,
 
 				// We have: "\xXY" (valid X, Y).
 				memcpy(hex, inputstr, 2);
-				parsedstr[out_i] = hex2bin(hex);
+				*parsedstr = hex2bin(hex);
 
 				inputstr += 2;
 				break;
@@ -877,14 +876,14 @@ static int parse_search_string(const char* inputstr, char* parsedstr,
 			}
 		} else {
 			// Nothing interesting.
-			parsedstr[out_i] = *inputstr;
+			*parsedstr = *inputstr;
 			++inputstr;
 		}
 
-		++out_i;
+		++parsedstr;
 	}
 
-	parsedstr[out_i] = '\0';
+	*parsedstr = '\0';
 
 	return PARSE_SUCCESS;
 }
