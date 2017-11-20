@@ -96,4 +96,31 @@ int clampi(int i, int min, int max);
  */
 int str2int(const char* s, int min, int max, int def);
 
+/*
+ * Reads inputstr and inserts 1 byte per "object" into parsedstr.
+ * parsedstr can then be used directly to search the file.
+ * err_info is a pointer into inputstr to relevant error information.
+ *
+ * Objects are:
+ *  - ASCII bytes entered normally e.g. 'a', '$', '2'.
+ *  - "\xXY" where X and Y match [0-9a-fA-F] (hex representation of bytes).
+ *  - "\\" which represents a single '\'
+ *
+ * Both parsedstr must be able to fit all the characters in inputstr,
+ * including the terminating null byte.
+ *
+ * On success, PARSE_SUCCESS is returned and parsedstr can be used. On failure,
+ * an error from parse_errors is returned, err_info is set appropriately,
+ * and parsedstr is undefined.
+ *
+ * err_info:
+ *  PARSE_INVALID_HEX     - pointer "XY..." where XY is the invalid hex code.
+ *  PARSE_INVALID_ESCAPE  - pointer to "X..." where X is the invalid character
+ *                          following \.
+ *  other errors    - inputstr.
+ *  success         - inputstr.
+ */
+int parse_search_string(const char* inputstr, char* parsedstr,
+                        const char** err_info);
+
 #endif // HX_UTIL_H

@@ -248,3 +248,61 @@ void clear_screen() {
 	}
 }
 
+int parse_search_string(const char* inputstr, char* parsedstr,
+                        const char** err_info) {
+	// Used to pass values to hex2bin.
+	char hex[3] = {'\0'};
+	*err_info = inputstr;
+
+	while (*inputstr != '\0') {
+		if (*inputstr == '\\') {
+			++inputstr;
+			switch (*(inputstr)) {
+			case '\0':  // We have "\\0"
+				*parsedstr = '\0';
+				return PARSE_INCOMPLETE_BACKSLASH;
+			case '\\':  // We have: "\\".
+				*parsedstr = '\\';
+				++inputstr;
+				break;
+			case 'x':  // We have: "\x".
+				++inputstr;
+
+				if (*inputstr == '\0'
+				    || *(inputstr + 1) == '\0') {
+					*parsedstr = '\0';
+					return PARSE_INCOMPLETE_HEX;
+				}
+
+				if (!isxdigit(*inputstr)
+				    || !isxdigit(*(inputstr + 1))) {
+					*parsedstr = '\0';
+					*err_info = inputstr;
+					return PARSE_INVALID_HEX;
+				}
+
+				// We have: "\xXY" (valid X, Y).
+				memcpy(hex, inputstr, 2);
+				*parsedstr = hex2bin(hex);
+
+				inputstr += 2;
+				break;
+			default:
+				// No need to increment - we're failing.
+				*err_info = inputstr;
+                                return PARSE_INVALID_ESCAPE;
+			}
+		} else {
+			// Nothing interesting.
+			*parsedstr = *inputstr;
+			++inputstr;
+		}
+
+		++parsedstr;
+	}
+
+	*parsedstr = '\0';
+
+	return PARSE_SUCCESS;
+}
+
