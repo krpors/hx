@@ -819,14 +819,14 @@ void editor_process_command(struct editor* e, const char* cmd) {
  * Both parsedstr must be able to fit all the characters in inputstr,
  * including the terminating null byte.
  *
- * On success, SUCCESS is returned and parsedstr can be used. On failure,
+ * On success, PARSE_SUCCESS is returned and parsedstr can be used. On failure,
  * an error from parse_errors is returned, err_info is set appropriately,
  * and parsedstr is undefined.
  *
  * err_info:
- *  INVALID_HEX     - pointer "XY..." where XY is the invalid hex code.
- *  INVALID_ESCAPE  - pointer to "X..." where X is the invalid character
- *                    following \.
+ *  PARSE_INVALID_HEX     - pointer "XY..." where XY is the invalid hex code.
+ *  PARSE_INVALID_ESCAPE  - pointer to "X..." where X is the invalid character
+ *                          following \.
  *  other errors    - inputstr.
  *  success         - inputstr.
  */
@@ -843,7 +843,7 @@ static int parse_search_string(const char* inputstr, char* parsedstr,
 			switch (*(inputstr)) {
 			case '\0':  // We have "\\0"
 				*parsedstr = '\0';
-				return INCOMPLETE_BACKSLASH;
+				return PARSE_INCOMPLETE_BACKSLASH;
 			case '\\':  // We have: "\\".
 				parsedstr[out_i] = '\\';
 				++inputstr;
@@ -854,14 +854,14 @@ static int parse_search_string(const char* inputstr, char* parsedstr,
 				if (*inputstr == '\0'
 				    || *(inputstr + 1) == '\0') {
 					*parsedstr = '\0';
-					return INCOMPLETE_HEX;
+					return PARSE_INCOMPLETE_HEX;
 				}
 
 				if (!isxdigit(*inputstr)
 				    || !isxdigit(*(inputstr + 1))) {
 					*parsedstr = '\0';
 					*err_info = inputstr;
-					return INVALID_HEX;
+					return PARSE_INVALID_HEX;
 				}
 
 				// We have: "\xXY" (valid X, Y).
@@ -873,7 +873,7 @@ static int parse_search_string(const char* inputstr, char* parsedstr,
 			default:
 				// No need to increment - we're failing.
 				*err_info = inputstr;
-                                return INVALID_ESCAPE;
+                                return PARSE_INVALID_ESCAPE;
 			}
 		} else {
 			// Nothing interesting.
@@ -886,7 +886,7 @@ static int parse_search_string(const char* inputstr, char* parsedstr,
 
 	parsedstr[out_i] = '\0';
 
-	return SUCCESS;
+	return PARSE_SUCCESS;
 }
 
 void editor_process_search(struct editor* e, const char* str, enum search_direction dir) {
@@ -906,29 +906,29 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 	const char* parse_err;
 	int parse_errno = parse_search_string(str, parsedstr, &parse_err);
 	switch (parse_errno) {
-	case INCOMPLETE_BACKSLASH:
+	case PARSE_INCOMPLETE_BACKSLASH:
 		editor_statusmessage(e, STATUS_ERROR,
 				     "Nothing follows '\\' in search"
 				     " string: %s", str);
 		return;
-	case INCOMPLETE_HEX:
+	case PARSE_INCOMPLETE_HEX:
 		editor_statusmessage(e, STATUS_ERROR,
 				     "Incomplete hex value at end"
 				     " of search string: %s", str);
 		return;
-	case INVALID_HEX:
+	case PARSE_INVALID_HEX:
 		editor_statusmessage(e, STATUS_ERROR,
 				     "Invalid hex value (\\x%c%c)"
 				     " in search string: %s",
 				     *parse_err, *(parse_err + 1), str);
 		return;
-	case INVALID_ESCAPE:
+	case PARSE_INVALID_ESCAPE:
 		editor_statusmessage(e, STATUS_ERROR,
 				     "Invalid character after \\ (%c)"
 				     " in search string: %s",
 				     *parse_err, str);
 		return;
-	case SUCCESS:
+	case PARSE_SUCCESS:
 		// All good.
 		break;
 	}

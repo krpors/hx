@@ -37,11 +37,11 @@ enum key_codes {
 
 // Errors which may be returned by parse_search_string.
 enum parse_errors {
-	SUCCESS,
-	INCOMPLETE_BACKSLASH,  // "...\"
-	INCOMPLETE_HEX,        // "...\x" or "...\xA"
-	INVALID_HEX,           // "...\xXY..." and X or Y not in [a-zA-Z0-9]
-	INVALID_ESCAPE,        // "...\a..." and a is not '\' or 'x'
+	PARSE_SUCCESS,
+	PARSE_INCOMPLETE_BACKSLASH,  // "...\"
+	PARSE_INCOMPLETE_HEX,        // "...\x" or "...\xA"
+	PARSE_INVALID_HEX,           // "...\xXY..." and X or Y not in [a-zA-Z0-9]
+	PARSE_INVALID_ESCAPE,        // "...\a..." and a is not '\' or 'x'
 };
 
 /*
