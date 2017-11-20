@@ -106,7 +106,7 @@ int str2int(const char* s, int min, int max, int def);
  *  - "\xXY" where X and Y match [0-9a-fA-F] (hex representation of bytes).
  *  - "\\" which represents a single '\'
  *
- * Both parsedstr must be able to fit all the characters in inputstr,
+ * parsedstr must be able to fit all the characters in inputstr,
  * including the terminating null byte.
  *
  * On success, PARSE_SUCCESS is returned and parsedstr can be used. On failure,
@@ -117,8 +117,8 @@ int str2int(const char* s, int min, int max, int def);
  *  PARSE_INVALID_HEX     - pointer "XY..." where XY is the invalid hex code.
  *  PARSE_INVALID_ESCAPE  - pointer to "X..." where X is the invalid character
  *                          following \.
- *  other errors    - inputstr.
- *  success         - inputstr.
+ *  other errors          - inputstr.
+ *  success               - inputstr.
  */
 int parse_search_string(const char* inputstr, char* parsedstr,
                         const char** err_info);
