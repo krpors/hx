@@ -112,6 +112,9 @@ int read_key() {
 	char seq[4]; // escape sequence buffer.
 
 	switch (c) {
+	case KEY_BACKSPACE:
+	case KEY_CTRL_H:
+		return KEY_BACKSPACE;
 	case KEY_ESC:
 		// Escape key was pressed, OR things like delete, arrow keys, ...
 		// So we will try to read ahead a few bytes, and see if there's more.
