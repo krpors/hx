@@ -84,4 +84,3 @@ details, Use The Source Luke.
 # Wishlist and TODOs
 
 1. Perhaps a configuration file to control the colors or some default settings.
-1. Searching a byte sequence (not by ASCII) would be handy.
