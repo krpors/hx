@@ -14,6 +14,7 @@
 enum key_codes {
 	KEY_NULL      = 0,
 	KEY_CTRL_D    = 0x04,
+	KEY_CTRL_H    = 0x08,
 	KEY_CTRL_Q    = 0x11, // DC1, to exit the program.
 	KEY_CTRL_R    = 0x12, // DC2, to redo an action.
 	KEY_CTRL_S    = 0x13, // DC3, to save the current buffer.
