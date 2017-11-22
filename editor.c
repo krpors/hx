@@ -926,8 +926,10 @@ int editor_read_string(struct editor* e, char* dst, int len) {
 	}
 
 	// Safety guard. Our inputbuffer size is limited so stop
-	// incrementing our buffer index after this maximum.
-	if ((size_t) e->inputbuffer_index >= sizeof(e->inputbuffer)) {
+	// incrementing our buffer index after this maximum. We
+	// subtract the size with 1, to allow the last byte to be
+	// a null terminator for the string.
+	if ((size_t) e->inputbuffer_index >= sizeof(e->inputbuffer) - 1) {
 		return c;
 	}
 
