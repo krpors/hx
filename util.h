@@ -7,6 +7,8 @@
 #ifndef HX_UTIL_H
 #define HX_UTIL_H
 
+#include "charbuf.h"
+
 #include <stdbool.h>
 #include <termios.h>
 
@@ -120,7 +122,7 @@ int str2int(const char* s, int min, int max, int def);
  *  other errors          - inputstr.
  *  success               - inputstr.
  */
-int parse_search_string(const char* inputstr, char* parsedstr,
+int parse_search_string(const char* inputstr, struct charbuf* parsedstr,
                         const char** err_info);
 
 #endif // HX_UTIL_H

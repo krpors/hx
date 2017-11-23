@@ -248,7 +248,7 @@ void clear_screen() {
 	}
 }
 
-int parse_search_string(const char* inputstr, char* parsedstr,
+int parse_search_string(const char* inputstr, struct charbuf* parsedstr,
                         const char** err_info) {
 	// Used to pass values to hex2bin.
 	char hex[3] = {'\0'};
@@ -259,10 +259,9 @@ int parse_search_string(const char* inputstr, char* parsedstr,
 			++inputstr;
 			switch (*(inputstr)) {
 			case '\0':  // We have "\\0"
-				*parsedstr = '\0';
 				return PARSE_INCOMPLETE_BACKSLASH;
 			case '\\':  // We have: "\\".
-				*parsedstr = '\\';
+				charbuf_append(parsedstr, "\\", 1);
 				++inputstr;
 				break;
 			case 'x':  // We have: "\x".
@@ -270,39 +269,33 @@ int parse_search_string(const char* inputstr, char* parsedstr,
 
 				if (*inputstr == '\0'
 				    || *(inputstr + 1) == '\0') {
-					*parsedstr = '\0';
 					return PARSE_INCOMPLETE_HEX;
 				}
 
 				if (!isxdigit(*inputstr)
 				    || !isxdigit(*(inputstr + 1))) {
-					*parsedstr = '\0';
 					*err_info = inputstr;
 					return PARSE_INVALID_HEX;
 				}
 
 				// We have: "\xXY" (valid X, Y).
 				memcpy(hex, inputstr, 2);
-				*parsedstr = hex2bin(hex);
+				char bin = hex2bin(hex);
+				charbuf_append(parsedstr, &bin, 1);
 
 				inputstr += 2;
 				break;
 			default:
 				// No need to increment - we're failing.
 				*err_info = inputstr;
-				*parsedstr = '\0';
 				return PARSE_INVALID_ESCAPE;
 			}
 		} else {
 			// Nothing interesting.
-			*parsedstr = *inputstr;
+			charbuf_append(parsedstr, inputstr, 1);
 			++inputstr;
 		}
-
-		++parsedstr;
 	}
-
-	*parsedstr = '\0';
 
 	return PARSE_SUCCESS;
 }

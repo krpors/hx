@@ -819,7 +819,15 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 		strncpy(e->searchstr, str, INPUT_BUF_SIZE);
 	}
 
-	char parsedstr[INPUT_BUF_SIZE];
+	// if we are already at the beginning of the file, no use for searching
+	// backwards any more.
+	if (dir == SEARCH_BACKWARD && editor_offset_at_cursor(e) == 0) {
+		editor_statusmessage(e, STATUS_INFO,
+				     "Already at start of the file");
+		return;
+	}
+
+	struct charbuf *parsedstr = charbuf_create();
 	const char* parse_err;
 	int parse_errno = parse_search_string(str, parsedstr, &parse_err);
 	switch (parse_errno) {
@@ -827,49 +835,49 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 		editor_statusmessage(e, STATUS_ERROR,
 				     "Nothing follows '\\' in search"
 				     " string: %s", str);
-		return;
+		break;
 	case PARSE_INCOMPLETE_HEX:
 		editor_statusmessage(e, STATUS_ERROR,
 				     "Incomplete hex value at end"
 				     " of search string: %s", str);
-		return;
+		break;
 	case PARSE_INVALID_HEX:
 		editor_statusmessage(e, STATUS_ERROR,
 				     "Invalid hex value (\\x%c%c)"
 				     " in search string: %s",
 				     *parse_err, *(parse_err + 1), str);
-		return;
+		break;
 	case PARSE_INVALID_ESCAPE:
 		editor_statusmessage(e, STATUS_ERROR,
 				     "Invalid character after \\ (%c)"
 				     " in search string: %s",
 				     *parse_err, str);
-		return;
+		break;
 	case PARSE_SUCCESS:
 		// All good.
 		break;
 	}
 
-	unsigned int current_offset = editor_offset_at_cursor(e);
+	if (parse_errno != PARSE_SUCCESS) {
+		// We printed an error message but we didn't return.
+		charbuf_free(parsedstr);
+		return;
+	}
 
+	unsigned int current_offset = editor_offset_at_cursor(e);
+	bool found = false;
 	if (dir == SEARCH_FORWARD) {
 		current_offset++;
 		for (; current_offset < e->content_length; current_offset++) {
-			if (memcmp(e->contents + current_offset, parsedstr,
-				   strlen(parsedstr)) == 0) {
+			if (memcmp(e->contents + current_offset,
+				   parsedstr->contents, parsedstr->len) == 0) {
 				editor_statusmessage(e, STATUS_INFO, "");
 				editor_scroll_to_offset(e, current_offset);
-				return;
+				found = true;
+				break;
 			}
 		}
 	} else if (dir == SEARCH_BACKWARD) {
-		// if we are already at the beginning of the file, no use for searching
-		// backwards any more.
-		if (current_offset == 0) {
-			editor_statusmessage(e, STATUS_INFO, "Already at start of the file");
-			return;
-		}
-
 		// Decrement the offset once, or else we keep comparing the current offset
 		// position with an already found string, keeping us in the same position.
 		current_offset--;
@@ -877,16 +885,19 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 		// Since we are working with unsigned integers, do this trick in the for-statement
 		// to 'include' the zero offset with comparing.
 		for (; current_offset-- != 0; ) {
-			if (memcmp(e->contents + current_offset, parsedstr,
-				   strlen(parsedstr)) == 0) {
+			if (memcmp(e->contents + current_offset,
+				   parsedstr->contents, parsedstr->len) == 0) {
 				editor_statusmessage(e, STATUS_INFO, "");
 				editor_scroll_to_offset(e, current_offset);
-				return;
+				found = true;
+				break;
 			}
 		}
 	}
 
-	editor_statusmessage(e, STATUS_WARNING, "String not found: '%s'", str);
+	charbuf_free(parsedstr);
+	if (!found) editor_statusmessage(e, STATUS_WARNING,
+					 "String not found: '%s'", str);
 }
 
 int editor_read_hex_input(struct editor* e, char* out) {
