@@ -35,8 +35,8 @@ Keys which can be used:
 	gg      : Move to start of file.
 	G       : Move to end of file.
 	x / DEL : Delete byte at cursor position.
-	/       : Start search input. "\\xYZ" can be used to search for
-	          byte value YZ, and '\\' must be escaped by another '\\'.
+	/       : Start search input. "\xYZ" can be used to search for
+	          byte value YZ, and '\' must be escaped by another '\'.
 	n       : Search for next occurrence.
 	N       : Search for previous occurrence.
 	u       : Undo the last action.
