@@ -385,7 +385,8 @@ void editor_render_ascii(struct editor* e, int rownum, unsigned int start_offset
 			charbuf_append(b, "\x1b[36m.", 6);
 		}
 	}
-	charbuf_append(b, "\x1b[0m", 4);
+	// Clear formatting, erase until the end of the line: \x1b[K
+	charbuf_append(b, "\x1b[0m\x1b[K", 7);
 }
 
 void editor_render_contents(struct editor* e, struct charbuf* b) {
@@ -619,7 +620,15 @@ void editor_render_status(struct editor* e, struct charbuf* b) {
 	//                       background color______/
 	}
 
-	charbuf_append(b, e->status_message, strlen(e->status_message));
+	// When the status message is longer than the terminal width, it may span multiple
+	// lines. This is not wanted behaviour, since the statusline is meant to be 1 line
+	// only. To prevent this , we make sure vsnprintf only prints the minimum
+	// between the size of the status_message and screen_cols.
+	int maxchars = strlen(e->status_message);
+	if (e->screen_cols <= maxchars) {
+		maxchars = e->screen_cols;
+	}
+	charbuf_append(b, e->status_message, maxchars);
 	charbuf_append(b, "\x1b[0m\x1b[0K", 8);
 }
 
