@@ -1201,6 +1201,7 @@ struct editor* editor_init() {
 	e->filename = NULL;
 	e->contents = NULL;
 	e->content_length = 0;
+	e->dirty = false;
 
 	memset(e->status_message, '\0', sizeof(e->status_message));
 
