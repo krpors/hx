@@ -36,6 +36,15 @@ enum key_codes {
 	KEY_PAGEDOWN,       // ??
 };
 
+// Errors which may be returned by parse_search_string.
+enum parse_errors {
+	PARSE_SUCCESS,
+	PARSE_INCOMPLETE_BACKSLASH,  // "...\"
+	PARSE_INCOMPLETE_HEX,        // "...\x" or "...\xA"
+	PARSE_INVALID_HEX,           // "...\xXY..." and X or Y not in [a-zA-Z0-9]
+	PARSE_INVALID_ESCAPE,        // "...\a..." and a is not '\' or 'x'
+};
+
 /*
  * Saves the current terminal state (the contents) so it can be restored
  * later, when hx exits. This behaviour is like any other terminal GUI

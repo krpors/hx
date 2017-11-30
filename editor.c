@@ -816,11 +816,6 @@ void editor_process_command(struct editor* e, const char* cmd) {
 }
 
 void editor_process_search(struct editor* e, const char* str, enum search_direction dir) {
-	if (str[0] == '0' && str[1] == 'x') {
-		// TODO: search hex value in e->contents
-		return;
-	}
-
 	// Empty search string, reset the searchstr to an empty one and
 	// stops searching anything.
 	if (strncmp(str, "", INPUT_BUF_SIZE) == 0) {
@@ -833,25 +828,66 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 		strncpy(e->searchstr, str, INPUT_BUF_SIZE);
 	}
 
-	unsigned int current_offset = editor_offset_at_cursor(e);
+	// if we are already at the beginning of the file, no use for searching
+	// backwards any more.
+	if (dir == SEARCH_BACKWARD && editor_offset_at_cursor(e) == 0) {
+		editor_statusmessage(e, STATUS_INFO,
+				     "Already at start of the file");
+		return;
+	}
 
+	struct charbuf *parsedstr = charbuf_create();
+	const char* parse_err;
+	int parse_errno = editor_parse_search_string(str, parsedstr,
+						     &parse_err);
+	switch (parse_errno) {
+	case PARSE_INCOMPLETE_BACKSLASH:
+		editor_statusmessage(e, STATUS_ERROR,
+				     "Nothing follows '\\' in search"
+				     " string: %s", str);
+		break;
+	case PARSE_INCOMPLETE_HEX:
+		editor_statusmessage(e, STATUS_ERROR,
+				     "Incomplete hex value at end"
+				     " of search string: %s", str);
+		break;
+	case PARSE_INVALID_HEX:
+		editor_statusmessage(e, STATUS_ERROR,
+				     "Invalid hex value (\\x%c%c)"
+				     " in search string: %s",
+				     *parse_err, *(parse_err + 1), str);
+		break;
+	case PARSE_INVALID_ESCAPE:
+		editor_statusmessage(e, STATUS_ERROR,
+				     "Invalid character after \\ (%c)"
+				     " in search string: %s",
+				     *parse_err, str);
+		break;
+	case PARSE_SUCCESS:
+		// All good.
+		break;
+	}
+
+	if (parse_errno != PARSE_SUCCESS) {
+		// We printed an error message but we didn't return.
+		charbuf_free(parsedstr);
+		return;
+	}
+
+	unsigned int current_offset = editor_offset_at_cursor(e);
+	bool found = false;
 	if (dir == SEARCH_FORWARD) {
 		current_offset++;
 		for (; current_offset < e->content_length; current_offset++) {
-			if (memcmp(e->contents + current_offset, str, strlen(str)) == 0) {
+			if (memcmp(e->contents + current_offset,
+				   parsedstr->contents, parsedstr->len) == 0) {
 				editor_statusmessage(e, STATUS_INFO, "");
 				editor_scroll_to_offset(e, current_offset);
-				return;
+				found = true;
+				break;
 			}
 		}
 	} else if (dir == SEARCH_BACKWARD) {
-		// if we are already at the beginning of the file, no use for searching
-		// backwards any more.
-		if (current_offset == 0) {
-			editor_statusmessage(e, STATUS_INFO, "Already at start of the file");
-			return;
-		}
-
 		// Decrement the offset once, or else we keep comparing the current offset
 		// position with an already found string, keeping us in the same position.
 		current_offset--;
@@ -859,15 +895,71 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 		// Since we are working with unsigned integers, do this trick in the for-statement
 		// to 'include' the zero offset with comparing.
 		for (; current_offset-- != 0; ) {
-			if (memcmp(e->contents + current_offset, str, strlen(str)) == 0) {
+			if (memcmp(e->contents + current_offset,
+				   parsedstr->contents, parsedstr->len) == 0) {
 				editor_statusmessage(e, STATUS_INFO, "");
 				editor_scroll_to_offset(e, current_offset);
-				return;
+				found = true;
+				break;
 			}
 		}
 	}
 
-	editor_statusmessage(e, STATUS_WARNING, "String not found: '%s'", str);
+	charbuf_free(parsedstr);
+	if (!found) editor_statusmessage(e, STATUS_WARNING,
+					 "String not found: '%s'", str);
+}
+
+int editor_parse_search_string(const char* inputstr, struct charbuf* parsedstr,
+			       const char** err_info) {
+	// Used to pass values to hex2bin.
+	char hex[3] = {'\0'};
+	*err_info = inputstr;
+
+	while (*inputstr != '\0') {
+		if (*inputstr == '\\') {
+			++inputstr;
+			switch (*(inputstr)) {
+			case '\0':  // We have "\\0"
+				return PARSE_INCOMPLETE_BACKSLASH;
+			case '\\':  // We have: "\\".
+				charbuf_append(parsedstr, "\\", 1);
+				++inputstr;
+				break;
+			case 'x':  // We have: "\x".
+				++inputstr;
+
+				if (*inputstr == '\0'
+				    || *(inputstr + 1) == '\0') {
+					return PARSE_INCOMPLETE_HEX;
+				}
+
+				if (!isxdigit(*inputstr)
+				    || !isxdigit(*(inputstr + 1))) {
+					*err_info = inputstr;
+					return PARSE_INVALID_HEX;
+				}
+
+				// We have: "\xXY" (valid X, Y).
+				memcpy(hex, inputstr, 2);
+				char bin = hex2bin(hex);
+				charbuf_append(parsedstr, &bin, 1);
+
+				inputstr += 2;
+				break;
+			default:
+				// No need to increment - we're failing.
+				*err_info = inputstr;
+				return PARSE_INVALID_ESCAPE;
+			}
+		} else {
+			// Nothing interesting.
+			charbuf_append(parsedstr, inputstr, 1);
+			++inputstr;
+		}
+	}
+
+	return PARSE_SUCCESS;
 }
 
 int editor_read_hex_input(struct editor* e, char* out) {

@@ -147,6 +147,33 @@ void editor_process_command(struct editor* e, const char* cmd);
 void editor_process_search(struct editor* e, const char* str, enum search_direction dir);
 
 /*
+ * Reads inputstr and inserts 1 byte per "object" into parsedstr.
+ * parsedstr can then be used directly to search the file.
+ * err_info is a pointer into inputstr to relevant error information.
+ *
+ * Objects are:
+ *  - ASCII bytes entered normally e.g. 'a', '$', '2'.
+ *  - "\xXY" where X and Y match [0-9a-fA-F] (hex representation of bytes).
+ *  - "\\" which represents a single '\'
+ *
+ * parsedstr must be able to fit all the characters in inputstr,
+ * including the terminating null byte.
+ *
+ * On success, PARSE_SUCCESS is returned and parsedstr can be used. On failure,
+ * an error from parse_errors is returned, err_info is set appropriately,
+ * and parsedstr is undefined.
+ *
+ * err_info:
+ *  PARSE_INVALID_HEX     - pointer "XY..." where XY is the invalid hex code.
+ *  PARSE_INVALID_ESCAPE  - pointer to "X..." where X is the invalid character
+ *                          following \.
+ *  other errors          - inputstr.
+ *  success               - inputstr.
+ */
+int editor_parse_search_string(const char* inputstr, struct charbuf* parsedstr,
+			       const char** err_info);
+
+/*
  * Processes a keypress accordingly.
  */
 void editor_process_keypress(struct editor* e);
