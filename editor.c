@@ -829,7 +829,8 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 
 	struct charbuf *parsedstr = charbuf_create();
 	const char* parse_err;
-	int parse_errno = parse_search_string(str, parsedstr, &parse_err);
+	int parse_errno = editor_parse_search_string(str, parsedstr,
+						     &parse_err);
 	switch (parse_errno) {
 	case PARSE_INCOMPLETE_BACKSLASH:
 		editor_statusmessage(e, STATUS_ERROR,
@@ -898,6 +899,58 @@ void editor_process_search(struct editor* e, const char* str, enum search_direct
 	charbuf_free(parsedstr);
 	if (!found) editor_statusmessage(e, STATUS_WARNING,
 					 "String not found: '%s'", str);
+}
+
+int editor_parse_search_string(const char* inputstr, struct charbuf* parsedstr,
+			       const char** err_info) {
+	// Used to pass values to hex2bin.
+	char hex[3] = {'\0'};
+	*err_info = inputstr;
+
+	while (*inputstr != '\0') {
+		if (*inputstr == '\\') {
+			++inputstr;
+			switch (*(inputstr)) {
+			case '\0':  // We have "\\0"
+				return PARSE_INCOMPLETE_BACKSLASH;
+			case '\\':  // We have: "\\".
+				charbuf_append(parsedstr, "\\", 1);
+				++inputstr;
+				break;
+			case 'x':  // We have: "\x".
+				++inputstr;
+
+				if (*inputstr == '\0'
+				    || *(inputstr + 1) == '\0') {
+					return PARSE_INCOMPLETE_HEX;
+				}
+
+				if (!isxdigit(*inputstr)
+				    || !isxdigit(*(inputstr + 1))) {
+					*err_info = inputstr;
+					return PARSE_INVALID_HEX;
+				}
+
+				// We have: "\xXY" (valid X, Y).
+				memcpy(hex, inputstr, 2);
+				char bin = hex2bin(hex);
+				charbuf_append(parsedstr, &bin, 1);
+
+				inputstr += 2;
+				break;
+			default:
+				// No need to increment - we're failing.
+				*err_info = inputstr;
+				return PARSE_INVALID_ESCAPE;
+			}
+		} else {
+			// Nothing interesting.
+			charbuf_append(parsedstr, inputstr, 1);
+			++inputstr;
+		}
+	}
+
+	return PARSE_SUCCESS;
 }
 
 int editor_read_hex_input(struct editor* e, char* out) {
