@@ -337,6 +337,7 @@ void editor_setmode(struct editor* e, enum editor_mode mode) {
 	case MODE_NORMAL:        editor_statusmessage(e, STATUS_INFO, ""); break;
 	case MODE_APPEND:        editor_statusmessage(e, STATUS_INFO, "-- APPEND -- "); break;
 	case MODE_APPEND_ASCII:  editor_statusmessage(e, STATUS_INFO, "-- APPEND ASCII --"); break;
+	case MODE_REPLACE_ASCII: editor_statusmessage(e, STATUS_INFO, "-- REPLACE ASCII --"); break;
 	case MODE_INSERT:        editor_statusmessage(e, STATUS_INFO, "-- INSERT --"); break;
 	case MODE_INSERT_ASCII:  editor_statusmessage(e, STATUS_INFO, "-- INSERT ASCII --"); break;
 	case MODE_REPLACE:       editor_statusmessage(e, STATUS_INFO, "-- REPLACE --"); break;
@@ -644,6 +645,7 @@ void editor_refresh_screen(struct editor* e) {
 			 MODE_NORMAL |
 			 MODE_APPEND |
 			 MODE_APPEND_ASCII |
+			 MODE_REPLACE_ASCII |
 			 MODE_INSERT |
 			 MODE_INSERT_ASCII)) {
 
@@ -760,7 +762,7 @@ void editor_process_command(struct editor* e, const char* cmd) {
 			exit(0);
 		}
 	}
-	
+
 	if (strncmp(cmd, "q!", INPUT_BUF_SIZE) == 0) {
 		exit(0);
 		return;
@@ -1072,6 +1074,21 @@ void editor_process_keypress(struct editor* e) {
 		return;
 	}
 
+	if (e->mode & MODE_REPLACE_ASCII) {
+		char c = read_key();
+		if (c == KEY_ESC) {
+			editor_setmode(e, MODE_NORMAL);
+			return;
+		}
+
+		if (e->content_length > 0) {
+			editor_replace_byte(e, c);
+		} else {
+			editor_statusmessage(e, STATUS_ERROR, "File is empty, nothing to replace");
+		}
+		return;
+	}
+
 	if (e->mode & MODE_REPLACE) {
 		char out = 0;
 		if (e->content_length > 0) {
@@ -1142,6 +1159,7 @@ void editor_process_keypress(struct editor* e) {
 		case 'i': editor_setmode(e, MODE_INSERT);       return;
 		case 'I': editor_setmode(e, MODE_INSERT_ASCII); return;
 		case 'r': editor_setmode(e, MODE_REPLACE);      return;
+		case 'R': editor_setmode(e, MODE_REPLACE_ASCII);return;
 		case ':': editor_setmode(e, MODE_COMMAND);      return;
 		case '/': editor_setmode(e, MODE_SEARCH);       return;
 
@@ -1317,4 +1335,3 @@ void editor_free(struct editor* e) {
 	free(e->contents);
 	free(e);
 }
-
