@@ -557,6 +557,7 @@ void editor_render_help(struct editor* e) {
 		"i       : Insert mode. Inserts a byte at the current cursor position.\r\n"
 		"I       : Insert mode. Inserts the literal typed keys (except ESC).\r\n"
 		"r       : Replace mode. Replaces the byte at the current cursor position.\r\n"
+		"R       : Replace mode. Replaces the literal typed keys (except ESC).\r\n"
 		":       : Command mode. Commands can be typed and executed.\r\n"
 		"ESC     : Return to normal mode.\r\n"
 		"]       : Increment byte at cursor position with 1.\r\n"

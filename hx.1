@@ -121,6 +121,8 @@ I          : enable INSERT-ASCII mode.
 .It
 r          : enable REPLACE mode.
 .It
+R          : enable REPLACE-ASCII mode.
+.It
 ESC        : enable NORMAL mode.
 .It
 :          : enable COMMAND mode. See section
@@ -151,6 +153,10 @@ inserted.
 .Ss REPLACE
 In replace-mode, the editor replaces the current byte at the current offset with
 a byte of choice. Use 'r' when in normal-mode to switch to replace-mode.
+.Ss REPLACE-ASCII
+Same as the REPLACE mode, except everything that is typed on the keyboard will be
+replaced as-is. This can be useful to replace readable strings with something
+else without knowing the exact bytes for each character.
 .Ss COMMAND
 In command-mode, manual commands can be entered. This can be triggered by typing
 the colon (
@@ -226,4 +232,3 @@ SOFTWARE.
 
 Original implementation by Kevin Pors <krpors@gmail.com>, with indirect help
 of Salvatore Sanfilippo and his kilo editor <https://github.com/antirez/kilo>.
-
