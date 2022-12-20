@@ -158,7 +158,10 @@ int main(int argc, char* argv[]) {
 	struct sigaction act;
 	memset(&act, 0, sizeof(struct sigaction));
 	act.sa_handler = handle_term_resize;
-	sigaction(SIGWINCH, &act, NULL);
+	if (sigaction(SIGWINCH, &act, NULL) == -1) {
+		perror("Could not call sigaction");
+		abort();
+	}
 	resizeflag = 0;
 
 	// Editor configuration passed around.

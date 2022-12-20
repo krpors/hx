@@ -25,6 +25,10 @@ const char* action_type_name(enum action_type type) {
 
 struct action_list* action_list_init() {
 	struct action_list* list = malloc(sizeof(struct action_list));
+	if (list == NULL) {
+		perror("Could not allocate memory for action list");
+		abort();
+	}
 	list->head = NULL;
 	list->tail = NULL;
 	list->curr = NULL;
@@ -35,6 +39,10 @@ void action_list_add(struct action_list* list, enum action_type type, int offset
 	assert(list != NULL);
 
 	struct action* action = malloc(sizeof(struct action));
+	if (action == NULL) {
+		perror("Could not allocate memory for action");
+		abort();
+	}
 	action->prev = NULL;
 	action->next = NULL;
 	action->act = type;
@@ -212,4 +220,3 @@ void action_list_move(struct action_list* list, int direction) {
 		}
 	}
 }
-

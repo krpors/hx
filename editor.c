@@ -94,6 +94,10 @@ void editor_move_cursor(struct editor* e, int dir, int amount) {
 
 void editor_newfile(struct editor* e, const char* filename) {
 	e->filename = malloc(strlen(filename) + 1);
+	if (e->filename == NULL) {
+		perror("Could not allocate memory for the filename");
+		abort();
+	}
 	strncpy(e->filename, filename, strlen(filename) + 1);
 	e->contents = malloc(0);
 	e->content_length = 0;
@@ -154,6 +158,10 @@ void editor_openfile(struct editor* e, const char* filename) {
 		// buffer, No need for extra room for a null string terminator, since
 		// we're possibly reading binary data only anyway (which can contain 0x00).
 		contents = malloc(sizeof(char) * statbuf.st_size);
+		if (contents == NULL) {
+			perror("Could not allocate memory for the file specified");
+			abort();
+		}
 		content_length = statbuf.st_size;
 
 		// fread() has a massive performance improvement when reading large files.
@@ -166,6 +174,10 @@ void editor_openfile(struct editor* e, const char* filename) {
 
 	 // duplicate string without using gnu99 strdup().
 	e->filename = malloc(strlen(filename) + 1);
+	if (e->filename == NULL) {
+		perror("Could not allocate memory for the filename");
+		abort();
+	}
 	strncpy(e->filename, filename, strlen(filename) + 1);
 	e->contents = contents;
 	e->content_length = content_length;
@@ -177,7 +189,10 @@ void editor_openfile(struct editor* e, const char* filename) {
 		editor_statusmessage(e, STATUS_INFO, "\"%s\" (%d bytes)", e->filename, e->content_length);
 	}
 
-	fclose(fp);
+	if (fclose(fp) != 0) {
+		perror("Could not close file properly");
+		abort();
+	}
 }
 
 void editor_writefile(struct editor* e) {
@@ -198,7 +213,10 @@ void editor_writefile(struct editor* e) {
 	editor_statusmessage(e, STATUS_INFO, "\"%s\", %d bytes written", e->filename, e->content_length);
 	e->dirty = false;
 
-	fclose(fp);
+	if (fclose(fp) != 0) {
+		perror("Could not close file properly");
+		abort();
+	}
 }
 
 
@@ -351,6 +369,10 @@ int editor_statusmessage(struct editor* e, enum status_severity sev, const char*
 	va_list ap;
 	va_start(ap, fmt);
 	int x = vsnprintf(e->status_message, sizeof(e->status_message), fmt, ap);
+	if (x < 0) {
+		fprintf(stderr, "Unable to format string");
+		abort();
+	}
 	va_end(ap);
 
 	e->status_severity = sev;
@@ -507,6 +529,10 @@ void editor_render_contents(struct editor* e, struct charbuf* b) {
 		//                                       padding chars
 		int padding_size = (e->octets_per_line * 2) + (e->octets_per_line / e->grouping) - row_char_count;
 		char* padding = malloc(padding_size * sizeof(char));
+		if (padding == NULL) {
+			perror("Could not allocate memory for padding");
+			abort();
+		}
 		memset(padding, ' ', padding_size);
 		charbuf_append(b, padding, padding_size);
 		charbuf_append(b, "\x1b[0m  ", 6);
@@ -600,8 +626,17 @@ void editor_render_ruler(struct editor* e, struct charbuf* b) {
 	int rmbw = snprintf(rulermsg, sizeof(rulermsg),
 			"0x%09x,%d (%02x)  %d%%",
 			offset_at_cursor, offset_at_cursor, val, percentage);
+	if (rmbw < 0) {
+		fprintf(stderr, "Could not create ruler string!");
+		return;
+	}
+
 	// Create a string for the buffer to position the cursor.
 	int cpbw = snprintf(buf, sizeof(buf), "\x1b[0m\x1b[%d;%dH", e->screen_rows, e->screen_cols - rmbw);
+	if (cpbw < 0) {
+		fprintf(stderr, "Could not create cursor position string!");
+		return;
+	}
 
 	// First write the cursor string, followed by the ruler message.
 	charbuf_append(b, buf, cpbw);
@@ -1302,6 +1337,10 @@ void editor_redo(struct editor* e) {
  */
 struct editor* editor_init() {
 	struct editor* e = malloc(sizeof(struct editor));
+	if (e == NULL) {
+		perror("Cannot allocate memory for editor");
+		abort();
+	}
 
 	e->octets_per_line = 16;
 	e->grouping = 2;
