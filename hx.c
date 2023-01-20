@@ -159,7 +159,7 @@ int main(int argc, char* argv[]) {
 	memset(&act, 0, sizeof(struct sigaction));
 	act.sa_handler = handle_term_resize;
 	if (sigaction(SIGWINCH, &act, NULL) == -1) {
-		perror("Could not call sigaction");
+		perror("A sigaction() call failed");
 		abort();
 	}
 	resizeflag = 0;
