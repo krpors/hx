@@ -799,6 +799,11 @@ void editor_process_command(struct editor* e, const char* cmd) {
 		}
 	}
 
+	if (strncmp(cmd, "wq", INPUT_BUF_SIZE) == 0 || strncmp(cmd, "wq!", INPUT_BUF_SIZE) == 0) {
+		editor_writefile(e);
+		exit(0);
+	}
+
 	if (strncmp(cmd, "q!", INPUT_BUF_SIZE) == 0) {
 		exit(0);
 		return;
