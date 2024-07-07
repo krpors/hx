@@ -115,6 +115,10 @@ int read_key() {
 	case KEY_BACKSPACE:
 	case KEY_CTRL_H:
 		return KEY_BACKSPACE;
+	case KEY_CTRL_B:
+		return KEY_PAGEUP;
+	case KEY_CTRL_F:
+		return KEY_PAGEDOWN;
 	case KEY_ESC:
 		// Escape key was pressed, OR things like delete, arrow keys, ...
 		// So we will try to read ahead a few bytes, and see if there's more.

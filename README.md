@@ -30,6 +30,10 @@ Keys which can be used:
 	CTRL+S  : Save (in place).
 	hjkl    : Vim like cursor movement.
 	Arrows  : Also moves the cursor around.
+	CTRL+F  : Scroll one screen forward.
+	CTRL+B  : Scroll one screen backward.
+	PgDn    : Same as CTRL+F.
+	PgUp    : Same as CTRL+B.
 	w       : Skip one group of bytes to the right.
 	b       : Skip one group of bytes to the left.
 	gg      : Move to start of file.
