@@ -70,7 +70,7 @@ struct action_list {
  * Creates an action_list on the heap, initializes the head and tail to NULL
  * and returns it.
  */
-struct action_list* action_list_init();
+struct action_list* action_list_init(void);
 
 /*
  * Adds an `action' to the tail of the list by allocating it on the heap, and

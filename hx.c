@@ -40,7 +40,7 @@ volatile sig_atomic_t resizeflag; // flag indicating a SIGWINCH signal was recei
 /*
  * Exits the editor, frees some stuff and resets the terminal setting.
  */
-static void editor_exit() {
+static void editor_exit(void) {
 	editor_free(g_ec);
 	clear_screen();
 	disable_raw_mode();
@@ -72,7 +72,7 @@ static void print_help(const char* explanation) {
 /*
  * Prints some version information back to the stdout.
  */
-static void print_version() {
+static void print_version(void) {
 	printf("hx version %s (git: %s)\n", HX_VERSION, HX_GIT_HASH);
 }
 
@@ -111,7 +111,7 @@ static void handle_term_resize(int sig) {
 	resizeflag = 1;
 }
 
-static void resize_term() {
+static void resize_term(void) {
 	clear_screen();
 	get_window_size(&(g_ec->screen_rows), &(g_ec->screen_cols));
 }

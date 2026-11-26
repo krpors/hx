@@ -2,9 +2,10 @@ hx_git_hash != git rev-parse --verify HEAD --short=12
 hx_version != git describe --tags 2>/dev/null || echo "1.0.0"
 
 CPPFLAGS = -DNDEBUG -DHX_GIT_HASH=\"$(hx_git_hash)\" -DHX_VERSION=\"$(hx_version)\"
-CPPFLAGS += -D_POSIX_SOURCE # sigaction
-CPPFLAGS += -D__BSD_VISIBLE # SIGWINCH on FreeBSD.
-CFLAGS = -std=c99 -Wall -Wextra -pedantic -O3 -MMD -MP
+CPPFLAGS += -D_POSIX_SOURCE # For sigaction.
+CPPFLAGS += -D_C99_SOURCE # For snprintf/vsnprintf on macOS.
+CPPFLAGS += -D__BSD_VISIBLE # For SIGWINCH on FreeBSD.
+CFLAGS = -std=c99 -Wall -Wextra -Werror -pedantic -O3 -MMD -MP
 LDFLAGS = -O3
 
 objects := hx.o editor.o charbuf.o util.o undo.o

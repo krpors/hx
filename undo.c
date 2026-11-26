@@ -23,7 +23,7 @@ const char* action_type_name(enum action_type type) {
 }
 
 
-struct action_list* action_list_init() {
+struct action_list* action_list_init(void) {
 	struct action_list* list = malloc(sizeof(struct action_list));
 	if (list == NULL) {
 		perror("Could not allocate memory for action list");

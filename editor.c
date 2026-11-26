@@ -1344,7 +1344,7 @@ void editor_redo(struct editor* e) {
 /*
  * Initializes editor struct with some default values.
  */
-struct editor* editor_init() {
+struct editor* editor_init(void) {
 	struct editor* e = malloc(sizeof(struct editor));
 	if (e == NULL) {
 		perror("Cannot allocate memory for editor");

@@ -17,7 +17,7 @@
 /*
  * Create a charbuf on the heap and return it.
  */
-struct charbuf* charbuf_create() {
+struct charbuf* charbuf_create(void) {
 	struct charbuf* b = malloc(sizeof(struct charbuf));
 	if (b) {
 		b->contents = NULL;
