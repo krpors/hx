@@ -97,7 +97,7 @@ int str2int(const char* s, int min, int max, int def) {
  *
  * read_key() will only return the correct key code, or -1 when anything fails.
  */
-int read_key() {
+int read_key(void) {
 	char c;
 	ssize_t nread;
 	// check == 0 to see if EOF.
@@ -189,20 +189,20 @@ bool get_window_size(int* rows, int* cols) {
 	return true;
 }
 
-void term_state_save() {
+void term_state_save(void) {
 	// Write a sequence to save the current terminal state (with all the characters
 	// being displayed and such). The + 1 is added to squelch GCC warnings.
 	(void) (write(STDOUT_FILENO, "\x1b[?1049h", 8) + 1);
 }
 
-void term_state_restore() {
+void term_state_restore(void) {
 	// Write a sequence to restore the previously saved terminal state. The +1 is
 	// added to squelch GCC warnings.
 	//(void) (write(STDOUT_FILENO, "\x1b[1049l", 8));
 	(void) (write(STDOUT_FILENO, "\x1b[?1049l", 8) + 1);
 }
 
-void enable_raw_mode() {
+void enable_raw_mode(void) {
 	// only enable raw mode when stdin is a tty.
 	if (!isatty(STDIN_FILENO)) {
 		perror("Input is not a TTY");
@@ -236,7 +236,7 @@ void enable_raw_mode() {
 	}
 }
 
-void disable_raw_mode() {
+void disable_raw_mode(void) {
 	// Reset the terminal settings to the state before hx was started.
 	tcsetattr(STDIN_FILENO, TCSAFLUSH, &orig_termios);
 	// Also, emit a ^[?25h sequence to show the cursor again. The void
@@ -246,7 +246,7 @@ void disable_raw_mode() {
 }
 
 
-void clear_screen() {
+void clear_screen(void) {
 	// clear the colors, move the cursor up-left, clear the screen.
 	char stuff[80];
 	int bw = snprintf(stuff, 80, "\x1b[0m\x1b[H\x1b[2J");

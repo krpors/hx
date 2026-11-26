@@ -80,7 +80,7 @@ struct editor {
 /*
  * Initializes the editor struct with basic values.
  */
-struct editor* editor_init();
+struct editor* editor_init(void);
 
 /*
  * Finds the cursor position at the given offset, taking the lines into account.

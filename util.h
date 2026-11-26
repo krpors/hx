@@ -53,19 +53,19 @@ enum parse_errors {
  * application. Currently, this writes the 'smcup' terminal capability.
  * I'm unsure how this will behave when the cap is not available.
  */
-void term_state_save();
+void term_state_save(void);
 
 /*
  * This restores the previously saved terminal contents. This will write
  * the termcap `rmcup' to stdout. Like term_state_save, I'm not sure how
  * this will behave when the cap is unavailable.
  */
-void term_state_restore();
+void term_state_restore(void);
 
-void enable_raw_mode();
-void disable_raw_mode();
-void clear_screen();
-int  read_key();
+void enable_raw_mode(void);
+void disable_raw_mode(void);
+void clear_screen(void);
+int  read_key(void);
 int  hex2bin(const char* s);
 bool get_window_size(int* rows, int* cols);
 
